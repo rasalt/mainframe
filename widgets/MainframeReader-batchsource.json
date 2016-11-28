@@ -14,13 +14,7 @@
         {
           "widget-type": "textarea",
           "label": "COBOL Copybook",
-          "name": "copybookContents",
-          "plugin-function": {
-            "method": "POST",
-            "widget": "outputSchema",
-            "output-property": "schema",
-            "plugin-method": "outputSchema"
-          }
+          "name": "copybookContents"
         },
         {
           "widget-type": "textbox",
