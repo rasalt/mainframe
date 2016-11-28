@@ -6,7 +6,7 @@ Introduction
 ============
 
 Mainframe Reader plugin is a source plugin for Hydrator that can read EBCDIC data format. It uses JRecord and Cobol copy book input format to read mainframe data. 
-To use the plugin the binary mainframe file and the copybook is needed. Various EBCDIC CCSIDs (Coded Character Set Identifiers) are supported. 
+To use the plugin the binary mainframe file and the copybook is needed. Various EBCDIC CCSIDs (Coded Character Set Identifiers) are supported:
  - EBCDIC US (CCSID 037)
  - EBCDIC Germany (CCSID 237)
  - EBCDIC-Arabic (CCSID 420)
