@@ -50,6 +50,10 @@ You can deploy a plugin using the CDAP CLI::
 
 You can build without running tests: ``mvn clean install -DskipTests``
 
+Limitations
+-----------
+- UI doesn't support schema's with hyphens (-), so the plugin currently transforms all the schemas with - into underscores (_). This change will be reverted after this is fixed: https://issues.cask.co/browse/HYDRATOR-1125
+
 Mailing Lists
 -------------
 CDAP User Group and Development Discussions:
