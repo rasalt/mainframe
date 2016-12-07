@@ -16,7 +16,6 @@
 
 package co.cask.hydrator.plugin.batch;
 
-import com.google.common.collect.ImmutableMap;
 import net.sf.JRecord.Common.CommonBits;
 import net.sf.JRecord.Common.RecordException;
 import net.sf.JRecord.Details.LayoutDetail;
@@ -30,16 +29,15 @@ import net.sf.cb2xml.def.Cb2xmlConstants;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Utility class to parse and read COBOL Copybook and binary data file contents.
  */
 public class CopybookIOUtils {
 
-
-  private static final Map<String, String> charsetToFontLookup = ImmutableMap.of("EBCDIC US", "cp037");
-
+  public static final String FONT = "cp037";
 
   /**
    * Get the schema properties from the Copybook contents
@@ -48,10 +46,10 @@ public class CopybookIOUtils {
    * @return ExternalRecord object defining the schema fields and their properties
    * @throws RecordException
    */
-  public static ExternalRecord getExternalRecord(InputStream cblIs, String font) throws RecordException {
+  public static ExternalRecord getExternalRecord(InputStream cblIs) throws RecordException {
     CommonBits.setDefaultCobolTextFormat(Cb2xmlConstants.USE_STANDARD_COLUMNS);
     CobolCopybookLoader copybookInt = new CobolCopybookLoader();
-    ExternalRecord record = copybookInt.loadCopyBook(cblIs, "", CopybookLoader.SPLIT_NONE, 0, font,
+    ExternalRecord record = copybookInt.loadCopyBook(cblIs, "", CopybookLoader.SPLIT_NONE, 0, FONT,
                                                      Convert.FMT_MAINFRAME, 0, null);
     return record;
   }
@@ -65,8 +63,12 @@ public class CopybookIOUtils {
    */
   public static int getRecordLength(ExternalRecord externalRecord, int fileStructure) {
     int recordByteLength = 0;
+    Set<Integer> fieldPositions = new HashSet<>();
     for (ExternalField field : externalRecord.getRecordFields()) {
-      recordByteLength += field.getLen();
+      if (!fieldPositions.contains(field.getPos())) {
+        recordByteLength += field.getLen();
+        fieldPositions.add(field.getPos());
+      }
     }
     return recordByteLength;
   }
