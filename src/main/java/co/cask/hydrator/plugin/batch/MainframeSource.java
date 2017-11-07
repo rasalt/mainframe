@@ -84,7 +84,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   @Override
   public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
     super.configurePipeline(pipelineConfigurer);
-    outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+    outputSchema = getOutputSchema(config.getCopybookContents(), config.getFont());
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
 
@@ -101,13 +101,13 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     } else {
       config.maxSplitSize = config.maxSplitSize * CONVERT_TO_BYTES;
     }
-    outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+    outputSchema = getOutputSchema(config.getCopybookContents(), config.getFont());
   }
 
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
     Job job = JobUtils.createInstance();
-    CopybookInputFormat.setCopybookInputformatCblContents(job, config.copybookContents);
+    CopybookInputFormat.setCopybookInputformatCblContents(job, config.getCopybookContents());
     CopybookInputFormat.setBinaryFilePath(job, config.binaryFilePath);
     // Set the input file path for the job
     CopybookInputFormat.setInputPaths(job, config.binaryFilePath);
@@ -309,6 +309,19 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
                    "EBCDIC-Greece (cp875), EBCDIC-International (cp500), EBCDOC-Italy (cp280), EBCDIC-Russia (cp410)," +
                    " EBCDIC-Spain (cp383), EBCDIC-Thailand (cp838), EBCDIC-Turkey (cp322).")
     private String charset;
+
+    @Nullable
+    @Description("Wrap Cobol delimiters with a constant. Wraps ':' with 'I' if enabled. " +
+        "This option is enabled by default")
+    private String wrapDelimiter;
+
+    public String getCopybookContents() {
+      if (wrapDelimiter != null && wrapDelimiter.toLowerCase().equals("yes")) {
+       return copybookContents.replace(":", "I");
+      } else {
+        return copybookContents;
+      }
+    }
 
     public String getFont() {
       if (charset == null || charset.isEmpty()) {

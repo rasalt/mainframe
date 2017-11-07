@@ -56,7 +56,19 @@
             ],
             "default": "EBCDIC-US"
           }
-        }
+        },
+        {
+         "widget-type": "select",
+         "label": "Wrap Cobol Delimiters",
+         "name": "wrapDelimiter",
+         "widget-attributes": {
+           "values": [
+             "Yes",
+             "No"
+           ],
+           "default": "Yes"
+         }
+       }
       ]
     }
   ],
