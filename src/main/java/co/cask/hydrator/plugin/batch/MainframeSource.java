@@ -45,6 +45,8 @@ import net.sf.JRecord.External.ExternalRecord;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -70,12 +72,15 @@ import javax.ws.rs.Path;
 @Description("Batch Source to read Mainframe fixed-length flat files")
 public class MainframeSource extends BatchSource<LongWritable, Map<String, AbstractFieldValue>, StructuredRecord> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);
+
   public static final long DEFAULT_MAX_SPLIT_SIZE_IN_MB = 1;
   private static final long CONVERT_TO_BYTES = 1024 * 1024;
 
   private final MainframeSourceConfig config;
   private Schema outputSchema;
-  private Set<String> fieldsToDrop = new HashSet<String>();
+  private Set<String> fieldsToKeep;
+  private Set<String> fieldsToDrop;
 
   public MainframeSource(MainframeSourceConfig mainframeSourceConfig) {
     this.config = mainframeSourceConfig;
@@ -85,15 +90,22 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
     super.configurePipeline(pipelineConfigurer);
     outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+    LOG.info("Output schema is: {}", outputSchema.toString());
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
 
   @Override
   public void initialize(BatchRuntimeContext context) throws Exception {
     super.initialize(context);
-    if (!Strings.isNullOrEmpty(config.drop)) {
+    if (!Strings.isNullOrEmpty(config.keep)) {
+      fieldsToKeep = new HashSet<>();
+      for (String keepField : Splitter.on(",").trimResults().split(config.keep)) {
+        fieldsToKeep.add(normalizeFieldName(keepField));
+      }
+    } else if (!Strings.isNullOrEmpty(config.drop)) {
+      fieldsToDrop = new HashSet<>();
       for (String dropField : Splitter.on(",").trimResults().split(config.drop)) {
-        fieldsToDrop.add(dropField.replace("-", "_"));
+        fieldsToDrop.add(normalizeFieldName(dropField));
       }
     }
     if (config.maxSplitSize == null) {
@@ -102,6 +114,10 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
       config.maxSplitSize = config.maxSplitSize * CONVERT_TO_BYTES;
     }
     outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+  }
+
+  private String normalizeFieldName(String fieldName) {
+    return fieldName.replace("-", "_");
   }
 
   @Override
@@ -125,14 +141,20 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
 
     Map<String, AbstractFieldValue> values = Maps.newHashMap();
     for (Map.Entry<String, AbstractFieldValue> entry : input.getValue().entrySet()) {
-      values.put(entry.getKey().replace("-", "_"), entry.getValue());
+      values.put(normalizeFieldName(entry.getKey()), entry.getValue());
     }
 
     StructuredRecord.Builder builder = StructuredRecord.builder(outputSchema);
     for (Schema.Field field : outputSchema.getFields()) {
       String fieldName = field.getName();
       if (values.containsKey(fieldName)) {
-        builder.set(fieldName, getFieldValue(values.get(fieldName)));
+        try {
+          builder.set(fieldName, getFieldValue(values.get(fieldName)));
+        } catch (Exception e) {
+          throw new IllegalArgumentException(String.format(
+            "Unable to extract value for field '%s' in record at offset %d: %s",
+            fieldName, input.getKey().get(), e.getMessage()));
+        }
       }
     }
     emitter.emit(builder.build());
@@ -155,8 +177,8 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
    */
   private Schema getOutputSchema(String copybookContents, String font) {
 
-    InputStream inputStream = null;
-    ExternalRecord externalRecord = null;
+    InputStream inputStream;
+    ExternalRecord externalRecord;
     List<Schema.Field> fields = Lists.newArrayList();
     try {
       inputStream = IOUtils.toInputStream(copybookContents, "UTF-8");
@@ -164,12 +186,14 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
       externalRecord = CopybookIOUtils.getExternalRecord(bufferedInputStream, font);
       String fieldName;
       for (ExternalField field : externalRecord.getRecordFields()) {
-        fieldName = field.getName().replace("-", "_");
-        if (fieldsToDrop.contains(fieldName)) {
+        fieldName = normalizeFieldName(field.getName());
+        if (fieldsToKeep != null && !fieldsToKeep.contains(fieldName)) {
+            continue;
+        }
+        if (fieldsToDrop != null && fieldsToDrop.contains(fieldName)) {
           continue;
         }
-        fields.add(Schema.Field.of(field.getName().replace("-", "_"),
-                                   Schema.nullableOf(Schema.of(getFieldSchemaType(field.getType())))));
+        fields.add(Schema.Field.of(fieldName, Schema.nullableOf(Schema.of(getFieldSchemaType(field.getType())))));
       }
       return Schema.recordOf("record", fields);
     } catch (IOException e) {
@@ -269,8 +293,8 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
                                                                         .put("EBCDIC-Thailand", "cp838")
                                                                         .put("EBCDIC-Turkey", "cp322").build();
 
-    private static final String DEFAULT_FONT = "cp037";
-
+    @VisibleForTesting
+    static final String DEFAULT_FONT = "cp037";
 
     @Description("Complete path of the .bin to be read; for example: 'hdfs://10.222.41.31:9000/test/DTAR020_FB.bin' " +
       "or 'file:///home/cdap/DTAR020_FB.bin'.\n " +
@@ -295,8 +319,14 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     private String copybookContents;
 
     @Nullable
-    @Description("Comma-separated list of fields to drop. For example: 'field1,field2,field3'.")
+    @Description("Comma-separated list of fields to drop. For example: 'field1,field2,field3'. " +
+      "If both fields to drop and fields to keep are given, fields to keep prevails.")
     private String drop;
+
+    @Nullable
+    @Description("Comma-separated list of fields to keep. For example: 'field1,field2,field3'. " +
+      "If both fields to drop and fields to keep are given, fields to keep prevails.")
+    private String keep;
 
     @Nullable
     @Description("Maximum split-size(MB) for each mapper in the MapReduce Job. Defaults to 1MB.")
@@ -304,27 +334,31 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     private Long maxSplitSize;
 
     @Nullable
+    @Description("Code page to use - an alternative notation to the Charset. For example, cp037 or cp322. " +
+      "If this is configured, it overrides the charset property.")
+    @VisibleForTesting
+    String codepage;
+
+    @Nullable
     @Description("Charset used to read the data. Available Charset: EBCDIC-US (cp307), EBCDIC-Germany (cp237), " +
                    "EBCDIC-Arabic (cp420), EBCDIC-Denmark, Norway (cp277), EBCDIC-France (cp297),\n" +
                    "EBCDIC-Greece (cp875), EBCDIC-International (cp500), EBCDOC-Italy (cp280), EBCDIC-Russia (cp410)," +
                    " EBCDIC-Spain (cp383), EBCDIC-Thailand (cp838), EBCDIC-Turkey (cp322).")
-    private String charset;
+    @VisibleForTesting
+    String charset;
 
     public String getFont() {
-      if (charset == null || charset.isEmpty()) {
-        return DEFAULT_FONT;
+      if (codepage != null && !codepage.isEmpty()) {
+        return codepage;
       }
-
-      String font = charsetToFontLookup.get(charset);
-
-      if (font == null || font.isEmpty()) {
-        return DEFAULT_FONT;
+      if (charset != null && !charset.isEmpty()) {
+        String font = charsetToFontLookup.get(charset);
+        if (font != null && !font.isEmpty()) {
+          return font;
+        }
       }
-
-      return font;
-
+      return DEFAULT_FONT;
     }
-
 
     public MainframeSourceConfig() {
       super(String.format("CopybookReader"));

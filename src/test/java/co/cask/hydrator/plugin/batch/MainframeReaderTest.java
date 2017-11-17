@@ -14,7 +14,7 @@
  * the License.
  */
 
-package co.cask.hydrator.plugin;
+package co.cask.hydrator.plugin.batch;
 
 import co.cask.cdap.api.artifact.ArtifactVersion;
 import co.cask.cdap.api.data.format.StructuredRecord;
@@ -38,9 +38,9 @@ import co.cask.cdap.test.DataSetManager;
 import co.cask.cdap.test.MapReduceManager;
 import co.cask.cdap.test.TestConfiguration;
 import co.cask.hydrator.common.Constants;
-import co.cask.hydrator.plugin.batch.CopybookIOUtils;
-import co.cask.hydrator.plugin.batch.MainframeSource;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import net.sf.JRecord.Common.RecordException;
 import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.LayoutDetail;
@@ -66,7 +66,9 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * Unit test for {@link co.cask.hydrator.plugin.batch.MainframeSource} classes.
@@ -85,7 +87,8 @@ public class MainframeReaderTest extends HydratorTestBase {
   @ClassRule
   public static TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private String cblContents = "000100*                                                                         \n" +
+  private static final String COPYBOOK_CONTENTS = "" +
+    "000100*                                                                         \n" +
     "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
     "000300*   CENTRAL REPORTING SYSTEM                                              \n" +
     "000400*                                                                         \n" +
@@ -101,6 +104,55 @@ public class MainframeReaderTest extends HydratorTestBase {
     "001400        03  DTAR020-QTY-SOLD           PIC S9(9)    COMP-3.               \n" +
     "001500        03  DTAR020-SALE-PRICE         PIC S9(9)V99 COMP-3.";
 
+  // a copybook that uses REDEFINES to also make the store available as a single string.
+  // the one above exposes keycode-no (8 chars = bytes) and store-no (3 digits comp-3 = 2 bytes)
+  // this one additionally exposes a 10-char kcode-string. This does not make much sense
+  // in real life (interpreting binary nibbles as characters) but works for testing here.
+  // Note that for this to work, the store-no must consist of numbers that are valid EBCDIC-US chars.
+  private static final String COPYBOOK_WITH_REDEFINE = "" +
+    "000100*                                                                         \n" +
+    "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
+    "000300*   CENTRAL REPORTING SYSTEM                                              \n" +
+    "000400*                                                                         \n" +
+    "000500*   CREATED BY BRUCE ARTHUR  19/12/90                                     \n" +
+    "000600*                                                                         \n" +
+    "000700*   RECORD LENGTH IS 27.                                                  \n" +
+    "000800*                                                                         \n" +
+    "000900        03  DTAR020-KCODE-STORE-ID.                                       \n" +
+    "000950            05 DTAR020-KCODE-STRING    PIC X(10).                         \n" +
+    "001000        03  DTAR020-KCODE-STORE-KEY REDEFINES                             \n" +
+    "001001                                    DTAR020-KCODE-STORE-ID.               \n" +
+    "001100            05 DTAR020-KEYCODE-NO      PIC X(08).                         \n" +
+    "001200            05 DTAR020-STORE-NO        PIC S9(03)   COMP-3.               \n" +
+    "001300        03  DTAR020-DATE               PIC S9(07)   COMP-3.               \n" +
+    "001400        03  DTAR020-DEPT-NO            PIC S9(03)   COMP-3.               \n" +
+    "001500        03  DTAR020-QTY-SOLD           PIC S9(9)    COMP-3.               \n" +
+    "001600        03  DTAR020-SALE-PRICE         PIC S9(9)V99 COMP-3.";
+
+  private static final Set<String> ALL_FIELDS = ImmutableSet.of("DTAR020_KEYCODE_NO",
+                                                                "DTAR020_STORE_NO",
+                                                                "DTAR020_DATE",
+                                                                "DTAR020_DEPT_NO",
+                                                                "DTAR020_QTY_SOLD",
+                                                                "DTAR020_SALE_PRICE");
+
+  private static final List<Map<String, Object>> FILE_CONTENTS = ImmutableList.<Map<String, Object>>of(
+    ImmutableMap.<String, Object>builder()
+      .put("DTAR020_KCODE_STRING", "69694158a*")
+      .put("DTAR020_KEYCODE_NO", "69694158")
+      .put("DTAR020_STORE_NO", 815.0)
+      .put("DTAR020_DATE", 40118.0)
+      .put("DTAR020_DEPT_NO", 280.0)
+      .put("DTAR020_QTY_SOLD", 1.0)
+      .put("DTAR020_SALE_PRICE", 5.01).build(),
+    ImmutableMap.<String, Object>builder()
+      .put("DTAR020_KCODE_STRING", "69694158b*")
+      .put("DTAR020_KEYCODE_NO", "63604808")
+      .put("DTAR020_STORE_NO", 825.0)
+      .put("DTAR020_DATE", 40118.0)
+      .put("DTAR020_DEPT_NO", 170.0)
+      .put("DTAR020_QTY_SOLD", 1.0)
+      .put("DTAR020_SALE_PRICE", 4.87).build());
 
   @BeforeClass
   public static void setupTest() throws Exception {
@@ -117,29 +169,42 @@ public class MainframeReaderTest extends HydratorTestBase {
   }
 
   @Test
-  public void testCopybookReaderWithRequiredFields() throws Exception {
+  public void testCopybookReaderWithDropOrKeep() throws Exception {
+    testCopybookReaderWithFields(COPYBOOK_CONTENTS, null, null, ALL_FIELDS);
+    testCopybookReaderWithFields(COPYBOOK_CONTENTS, null, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO",
+                                 ImmutableSet.of("DTAR020_DEPT_NO", "DTAR020_QTY_SOLD", "DTAR020_SALE_PRICE"));
+    testCopybookReaderWithFields(COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO", null,
+                                 ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE", "DTAR020_STORE_NO"));
+    testCopybookReaderWithFields(COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE", "DTAR020_DATE",
+                                 ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE"));
+  }
 
-    Schema schema = Schema.recordOf("record",
-                                    Schema.Field.of("DTAR020_KEYCODE_NO", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                        STRING))),
-                                    Schema.Field.of("DTAR020_DATE", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                  DOUBLE))),
-                                    Schema.Field.of("DTAR020_DEPT_NO", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                     DOUBLE))),
-                                    Schema.Field.of("DTAR020_QTY_SOLD", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                      DOUBLE))),
-                                    Schema.Field.of("DTAR020_SALE_PRICE", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                        DOUBLE))));
+  @Test
+  public void testCopybookReaderWithRedefines() throws Exception {
+    testCopybookReaderWithFields(COPYBOOK_WITH_REDEFINE,
+                                 "DTAR020_KEYCODE_NO,DTAR020_STORE_NO,DTAR020_KCODE_STRING",
+                                 null,
+                                 ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_STORE_NO", "DTAR020_KCODE_STRING"));
+  }
 
-    Map<String, String> sourceProperties = new ImmutableMap.Builder<String, String>()
+  public void testCopybookReaderWithFields(String copybook, @Nullable String keep, @Nullable String drop,
+                                           Set<String> expectedFields) throws Exception {
+
+    ImmutableMap.Builder<String, String> propsBulder = new ImmutableMap.Builder<String, String>()
       .put(Constants.Reference.REFERENCE_NAME, "TestCase")
-      .put("binaryFilePath", "src/test/resources/DTAR020_FB.bin")
-      .put("copybookContents", cblContents)
-      .put("drop", "DTAR020_STORE_NO")
-      .build();
+      // .put("binaryFilePath", "src/test/resources/DTAR020_FB.bin")
+      .put("binaryFilePath", "src/test/resources/DTAR020_F8-modified.bin")
+      .put("copybookContents", copybook);
+    if (keep != null) {
+      propsBulder.put("keep", keep);
+    }
+    if (drop != null) {
+      propsBulder.put("drop", drop);
+    }
+    Map<String, String> sourceProperties = propsBulder.build();
 
     ETLStage source = new ETLStage("MainframeReader", new ETLPlugin("MainframeReader", BatchSource.PLUGIN_TYPE,
-                                                                   sourceProperties, null));
+                                                                    sourceProperties, null));
 
     String outputDatasetName = "output-batchsourcetest";
     ETLStage sink = new ETLStage("sink", MockSink.getPlugin(outputDatasetName));
@@ -162,37 +227,40 @@ public class MainframeReaderTest extends HydratorTestBase {
     List<StructuredRecord> output = MockSink.readOutput(outputManager);
 
     Assert.assertEquals("Expected records", 2, output.size());
+    validateResult(0, expectedFields, FILE_CONTENTS.get(0), output.get(0));
+    validateResult(1, expectedFields, FILE_CONTENTS.get(1), output.get(1));
 
-    Map<String, Double> result = new HashMap<>();
-    result.put((String) output.get(0).get("DTAR020_KEYCODE_NO"), (Double) output.get(0).get("DTAR020_SALE_PRICE"));
-    result.put((String) output.get(1).get("DTAR020_KEYCODE_NO"), (Double) output.get(1).get("DTAR020_SALE_PRICE"));
+    MockSink.clear(outputManager);
+  }
 
-    Assert.assertEquals(4.87, result.get("63604808").doubleValue(), 0.1);
-    Assert.assertEquals(5.01, result.get("69694158").doubleValue(), 0.1);
-    Assert.assertEquals("Expected schema", output.get(0).getSchema(), schema);
+  private void validateResult(int i, Set<String> expectedFields,
+                              Map<String, Object> expected, StructuredRecord result) {
+    for (String field : ALL_FIELDS) {
+      if (expectedFields.contains(field)) {
+        Assert.assertEquals("Mismatch for field '" + field + "' in result #" + i,
+                            expected.get(field), result.get(field));
+      } else {
+        Assert.assertNull("Unxpected field '" + field + "' in result #" + i, result.get(field));
+      }
+    }
   }
 
   @Test
   public void testMainframeReaderWithAllFields() throws Exception {
 
-    Schema schema = Schema.recordOf("record",
-                                    Schema.Field.of("DTAR020_KEYCODE_NO", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                        STRING))),
-                                    Schema.Field.of("DTAR020_STORE_NO", Schema.nullableOf(Schema.of(Schema.Type
-                                                                                                      .DOUBLE))),
-                                    Schema.Field.of("DTAR020_DATE", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                  DOUBLE))),
-                                    Schema.Field.of("DTAR020_DEPT_NO", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                     DOUBLE))),
-                                    Schema.Field.of("DTAR020_QTY_SOLD", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                      DOUBLE))),
-                                    Schema.Field.of("DTAR020_SALE_PRICE", Schema.nullableOf(Schema.of(Schema.Type.
-                                                                                                        DOUBLE))));
+    Schema schema = Schema.recordOf(
+      "record",
+      Schema.Field.of("DTAR020_KEYCODE_NO", Schema.nullableOf(Schema.of(Schema.Type.STRING))),
+      Schema.Field.of("DTAR020_STORE_NO", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_DATE", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_DEPT_NO", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_QTY_SOLD", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_SALE_PRICE", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))));
 
     Map<String, String> sourceProperties = new ImmutableMap.Builder<String, String>()
       .put(Constants.Reference.REFERENCE_NAME, "TestCase")
       .put("binaryFilePath", "src/test/resources/DTAR020_FB.bin")
-      .put("copybookContents", cblContents)
+      .put("copybookContents", COPYBOOK_CONTENTS)
       .put("maxSplitSize", "5")
       .build();
 
@@ -271,7 +339,7 @@ public class MainframeReaderTest extends HydratorTestBase {
   @Test
   public void testDataTypes() throws Exception {
 
-    cblContents = "000100*                                                                         \n" +
+    String COPYBOOK_CONTENTS = "000100*                                                                         \n" +
       "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
       "000300*   CENTRAL REPORTING SYSTEM                                              \n" +
       "000400*                                                                         \n" +
@@ -291,32 +359,23 @@ public class MainframeReaderTest extends HydratorTestBase {
       "001800        03  DTAR020-ASSUMED-DECIMAL    \tPIC 999V99.   \n" +
       "001900        03  DTAR020-NUM-RIGHTJUSTIFIED \tPIC 9(5).";
 
-    Schema schema = Schema.recordOf("record",
-                                    Schema.Field.of("DTAR020_KEYCODE", Schema.nullableOf(Schema.of(
-                                      Schema.Type.STRING))),
-                                    Schema.Field.of("DTAR020_STORE_NO", Schema.nullableOf(Schema.of(
-                                      Schema.Type.LONG))),
-                                    Schema.Field.of("DTAR020_DATE", Schema.nullableOf(Schema.of(
-                                      Schema.Type.DOUBLE))),
-                                    Schema.Field.of("DTAR020_DEPT_NO", Schema.nullableOf(Schema.of(
-                                      Schema.Type.LONG))),
-                                    Schema.Field.of("DTAR020_QTY_SOLD", Schema.nullableOf(Schema.of(
-                                      Schema.Type.DOUBLE))),
-                                    Schema.Field.of("DTAR020_SALE_PRICE", Schema.nullableOf(Schema.of(
-                                      Schema.Type.FLOAT))),
-                                    Schema.Field.of("DTAR020_MRP", Schema.nullableOf(Schema.of(
-                                      Schema.Type.DOUBLE))),
-                                    Schema.Field.of("DTAR020_ZONED_DECIMAL", Schema.nullableOf(Schema.of(
-                                      Schema.Type.DOUBLE))),
-                                    Schema.Field.of("DTAR020_ASSUMED_DECIMAL", Schema.nullableOf(Schema.of(
-                                      Schema.Type.DOUBLE))),
-                                    Schema.Field.of("DTAR020_NUM_RIGHTJUSTIFIED", Schema.nullableOf(Schema.of(
-                                      Schema.Type.INT))));
+    Schema schema = Schema.recordOf(
+      "record",
+      Schema.Field.of("DTAR020_KEYCODE", Schema.nullableOf(Schema.of(Schema.Type.STRING))),
+      Schema.Field.of("DTAR020_STORE_NO", Schema.nullableOf(Schema.of(Schema.Type.LONG))),
+      Schema.Field.of("DTAR020_DATE", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_DEPT_NO", Schema.nullableOf(Schema.of(Schema.Type.LONG))),
+      Schema.Field.of("DTAR020_QTY_SOLD", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_SALE_PRICE", Schema.nullableOf(Schema.of(Schema.Type.FLOAT))),
+      Schema.Field.of("DTAR020_MRP", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_ZONED_DECIMAL", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_ASSUMED_DECIMAL", Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+      Schema.Field.of("DTAR020_NUM_RIGHTJUSTIFIED", Schema.nullableOf(Schema.of(Schema.Type.INT))));
 
     Map<String, String> sourceProperties = new ImmutableMap.Builder<String, String>()
       .put(Constants.Reference.REFERENCE_NAME, "TestCase")
-      .put("binaryFilePath", generateBinaryFile(cblContents))
-      .put("copybookContents", cblContents)
+      .put("binaryFilePath", generateBinaryFile(COPYBOOK_CONTENTS))
+      .put("copybookContents", COPYBOOK_CONTENTS)
       .build();
 
     ETLStage source = new ETLStage("MainframeReader", new ETLPlugin("MainframeReader", BatchSource.PLUGIN_TYPE,
@@ -393,4 +452,18 @@ public class MainframeReaderTest extends HydratorTestBase {
       throw new IllegalArgumentException("Error creating binary test file: " + e.getMessage(), e);
     }
   }
+
+  @Test
+  public void testConfig() {
+    MainframeSource.MainframeSourceConfig config = new MainframeSource.MainframeSourceConfig();
+    Assert.assertEquals(MainframeSource.MainframeSourceConfig.DEFAULT_FONT, config.getFont());
+    config.charset = "EBCDIC-International";
+    Assert.assertEquals("cp500", config.getFont());
+    config.codepage = "cp297";
+    Assert.assertEquals("cp297", config.getFont());
+    config.charset = null;
+    Assert.assertEquals("cp297", config.getFont());
+  }
 }
+
+

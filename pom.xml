@@ -128,11 +128,15 @@
       <groupId>net.sf.JRecord</groupId>
       <artifactId>JRecord</artifactId>
       <version>${jrecord.version}</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/repo/JRecord-0.80.8.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>net.sf.cb2xml</groupId>
       <artifactId>cb2xml</artifactId>
       <version>${cb2xml.version}</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/repo/cb2xml-0.80.8-jrecord.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -417,7 +421,7 @@
         <configuration>
           <instructions>
             <_exportcontents>co.cask.hydrator.plugin.batch.*</_exportcontents>
-            <Embed-Dependency>*;inline=false;scope=compile</Embed-Dependency>
+            <Embed-Dependency>*;inline=false;scope=compile|system</Embed-Dependency>
             <Embed-Transitive>true</Embed-Transitive>
             <Embed-Directory>lib</Embed-Directory>
             <!--Only @Plugin classes in the export packages will be included as plugin-->
