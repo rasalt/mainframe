@@ -52,10 +52,12 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import javax.ws.rs.Path;
 
@@ -76,6 +78,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
 
   public static final long DEFAULT_MAX_SPLIT_SIZE_IN_MB = 1;
   private static final long CONVERT_TO_BYTES = 1024 * 1024;
+  private static final Pattern RTRIM = Pattern.compile("\\s+$");
 
   private final MainframeSourceConfig config;
   private Schema outputSchema;
@@ -89,7 +92,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   @Override
   public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
     super.configurePipeline(pipelineConfigurer);
-    outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+    outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
     LOG.info("Output schema is: {}", outputSchema.toString());
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
@@ -113,7 +116,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     } else {
       config.maxSplitSize = config.maxSplitSize * CONVERT_TO_BYTES;
     }
-    outputSchema = getOutputSchema(config.copybookContents, config.getFont());
+    outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
   }
 
   private String normalizeFieldName(String fieldName) {
@@ -123,7 +126,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
     Job job = JobUtils.createInstance();
-    CopybookInputFormat.setCopybookInputformatCblContents(job, config.copybookContents);
+    CopybookInputFormat.setCopybookInputformatCblContents(job, config.getCopyBookContents());
     CopybookInputFormat.setBinaryFilePath(job, config.binaryFilePath);
     // Set the input file path for the job
     CopybookInputFormat.setInputPaths(job, config.binaryFilePath);
@@ -303,6 +306,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     @Macro
     private String binaryFilePath;
 
+    @VisibleForTesting
     @Description("Contents of the COBOL copybook file which will contain the data structure. For example: \n" +
       "000100*                                                                         \n" +
       "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
@@ -316,7 +320,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
       "001000            05 DTAR020-KEYCODE-NO      PIC X(08).                         \n" +
       "001100            05 DTAR020-STORE-NO        PIC S9(03)   COMP-3.               \n" +
       "001200        03  DTAR020-DATE               PIC S9(07)   COMP-3. ")
-    private String copybookContents;
+    String copybookContents;
 
     @Nullable
     @Description("Comma-separated list of fields to drop. For example: 'field1,field2,field3'. " +
@@ -347,6 +351,13 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     @VisibleForTesting
     String charset;
 
+    @Nullable
+    @Description("List of placeholder strings and their replacements, for example, 'a=b,x=y'. All occurrences of " +
+      "placeholders are replaced prior to loading the copybook. If after replacements a line of the copybook " +
+      "exceeds 72 characters, the copybook will not be accepted and this will result in an error.")
+    @VisibleForTesting
+    String replacements;
+
     public String getFont() {
       if (codepage != null && !codepage.isEmpty()) {
         return codepage;
@@ -368,6 +379,47 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     @VisibleForTesting
     public Long getMaxSplitSize() {
       return maxSplitSize;
+    }
+
+    @Nullable
+    public Map<String, String> getReplacements() {
+      if (replacements == null) {
+        return null;
+      }
+      Map<String, String> result = new HashMap<>();
+      for (String pair : replacements.split(",")) {
+        String[] subs = pair.split("=");
+        if (subs.length != 2) {
+          throw new IllegalArgumentException("Replacements must be of the form 'a=x,b=y,...' but is " + replacements);
+        }
+        result.put(subs[0].trim(), subs[1].trim());
+      }
+      return result.isEmpty() ? null : result;
+    }
+
+    public String getCopyBookContents() {
+      String copybook = copybookContents;
+      Map<String, String> replacementMap = getReplacements();
+      if (replacementMap != null) {
+        for (Map.Entry<String, String> entry : replacementMap.entrySet()) {
+          copybook = copybook.replaceAll(entry.getKey(), entry.getValue());
+        }
+      }
+      int lineNo = 0;
+      for (String line : copybook.split("\\r?\\n")) {
+        ++lineNo;
+        for (int i = line.length() - 1; i > 0; i--) {
+          String trimmed = RTRIM.matcher(line).replaceAll("");
+          if (trimmed.length() > 72) {
+            String message = String.format("Copybook line %d exceeds the maximum length of 72 characters. " +
+                                             "This may be caused by replacement strings that exceed the length " +
+                                             "of the placeholders they substitute. Please check your copybook and " +
+                                             "your replacements. ", lineNo);
+            throw new IllegalArgumentException(message);
+          }
+        }
+      }
+      return copybook;
     }
   }
 }

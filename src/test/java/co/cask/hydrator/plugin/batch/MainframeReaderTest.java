@@ -120,14 +120,32 @@ public class MainframeReaderTest extends HydratorTestBase {
     "000800*                                                                         \n" +
     "000900        03  DTAR020-KCODE-STORE-ID.                                       \n" +
     "000950            05 DTAR020-KCODE-STRING    PIC X(10).                         \n" +
-    "001000        03  DTAR020-KCODE-STORE-KEY REDEFINES                             \n" +
-    "001001                                    DTAR020-KCODE-STORE-ID.               \n" +
+    "001000        03  DTAR020-KCODE-STORE-KEY REDEFINES DTAR020-KCODE-STORE-ID.     \n" +
     "001100            05 DTAR020-KEYCODE-NO      PIC X(08).                         \n" +
     "001200            05 DTAR020-STORE-NO        PIC S9(03)   COMP-3.               \n" +
     "001300        03  DTAR020-DATE               PIC S9(07)   COMP-3.               \n" +
     "001400        03  DTAR020-DEPT-NO            PIC S9(03)   COMP-3.               \n" +
     "001500        03  DTAR020-QTY-SOLD           PIC S9(9)    COMP-3.               \n" +
     "001600        03  DTAR020-SALE-PRICE         PIC S9(9)V99 COMP-3.";
+
+  // After replacing :PREFIX: and "COMP: with DTAR020 and COMP-3,
+  // this copybook should yield the same outputs as COPYBOOK_CONTENTS
+  private static final String COPYBOOK_WITH_REPLACEMENTS = "" +
+    "000100*                                                                         \n" +
+    "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
+    "000300*   CENTRAL REPORTING SYSTEM                                              \n" +
+    "000400*                                                                         \n" +
+    "000500*   CREATED BY BRUCE ARTHUR  19/12/90                                     \n" +
+    "000600*                                                                         \n" +
+    "000700*   RECORD LENGTH IS 27.                                                  \n" +
+    "000800*                                                                         \n" +
+    "000900        03  :PREFIX:-KCODE-STORE-KEY.                                      \n" +
+    "001000            05 :PREFIX:-KEYCODE-NO      PIC X(08).                         \n" +
+    "001100            05 :PREFIX:-STORE-NO        PIC S9(03)   :COMP:.               \n" +
+    "001200        03  :PREFIX:-DATE               PIC S9(07)   :COMP:.               \n" +
+    "001300        03  :PREFIX:-DEPT-NO            PIC S9(03)   :COMP:.               \n" +
+    "001400        03  :PREFIX:-QTY-SOLD           PIC S9(9)    :COMP:.               \n" +
+    "001500        03  :PREFIX:-SALE-PRICE         PIC S9(9)V99 :COMP:.";
 
   private static final Set<String> ALL_FIELDS = ImmutableSet.of("DTAR020_KEYCODE_NO",
                                                                 "DTAR020_STORE_NO",
@@ -180,14 +198,28 @@ public class MainframeReaderTest extends HydratorTestBase {
   }
 
   @Test
+  public void testCopybookReaderWithReplacements() throws Exception {
+    testCopybookReaderWithFields(COPYBOOK_CONTENTS,
+                                 ":PREFIX:=DTAR020, :COMP:=COMP-3",
+                                 "DTAR020_KEYCODE_NO,DTAR020_DATE", "DTAR020_DATE",
+                                 ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE"));
+  }
+
+  @Test
   public void testCopybookReaderWithRedefines() throws Exception {
     testCopybookReaderWithFields(COPYBOOK_WITH_REDEFINE,
-                                 "DTAR020_KEYCODE_NO,DTAR020_STORE_NO,DTAR020_KCODE_STRING",
-                                 null,
+                                 "DTAR020_KEYCODE_NO,DTAR020_STORE_NO,DTAR020_KCODE_STRING", null,
                                  ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_STORE_NO", "DTAR020_KCODE_STRING"));
   }
 
-  public void testCopybookReaderWithFields(String copybook, @Nullable String keep, @Nullable String drop,
+  public void testCopybookReaderWithFields(String copybook,
+                                           @Nullable String keep, @Nullable String drop,
+                                           Set<String> expectedFields) throws Exception {
+    testCopybookReaderWithFields(copybook, null, keep, drop, expectedFields);
+  }
+
+  public void testCopybookReaderWithFields(String copybook, String replacements,
+                                           @Nullable String keep, @Nullable String drop,
                                            Set<String> expectedFields) throws Exception {
 
     ImmutableMap.Builder<String, String> propsBulder = new ImmutableMap.Builder<String, String>()
@@ -200,6 +232,9 @@ public class MainframeReaderTest extends HydratorTestBase {
     }
     if (drop != null) {
       propsBulder.put("drop", drop);
+    }
+    if (replacements != null) {
+      propsBulder.put("replacements", replacements);
     }
     Map<String, String> sourceProperties = propsBulder.build();
 
@@ -339,7 +374,7 @@ public class MainframeReaderTest extends HydratorTestBase {
   @Test
   public void testDataTypes() throws Exception {
 
-    String COPYBOOK_CONTENTS = "000100*                                                                         \n" +
+    String copybookContents = "000100*                                                                         \n" +
       "000200*   DTAR020 IS THE OUTPUT FROM DTAB020 FROM THE IML                       \n" +
       "000300*   CENTRAL REPORTING SYSTEM                                              \n" +
       "000400*                                                                         \n" +
@@ -374,8 +409,8 @@ public class MainframeReaderTest extends HydratorTestBase {
 
     Map<String, String> sourceProperties = new ImmutableMap.Builder<String, String>()
       .put(Constants.Reference.REFERENCE_NAME, "TestCase")
-      .put("binaryFilePath", generateBinaryFile(COPYBOOK_CONTENTS))
-      .put("copybookContents", COPYBOOK_CONTENTS)
+      .put("binaryFilePath", generateBinaryFile(copybookContents))
+      .put("copybookContents", copybookContents)
       .build();
 
     ETLStage source = new ETLStage("MainframeReader", new ETLPlugin("MainframeReader", BatchSource.PLUGIN_TYPE,
@@ -463,6 +498,30 @@ public class MainframeReaderTest extends HydratorTestBase {
     Assert.assertEquals("cp297", config.getFont());
     config.charset = null;
     Assert.assertEquals("cp297", config.getFont());
+
+    config.copybookContents = COPYBOOK_CONTENTS;
+    Assert.assertEquals(COPYBOOK_CONTENTS, config.getCopyBookContents());
+
+    config.copybookContents = COPYBOOK_WITH_REPLACEMENTS;
+    config.replacements = ":PREFIX:=DTAR020, :COMP:=COMP-3";
+    Assert.assertEquals(ImmutableMap.of(":PREFIX:", "DTAR020", ":COMP:", "COMP-3"), config.getReplacements());
+    Assert.assertEquals(COPYBOOK_CONTENTS, config.getCopyBookContents());
+
+    config.replacements = "a=b,c";
+    try {
+      config.getReplacements();
+      Assert.fail("expected illegal argument");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
+
+    config.replacements = ":PREFIX:=DTAR020ANDSOMEMORELENGHTYTEXT, :COMP:=COMP-3";
+    try {
+      config.getCopyBookContents();
+      Assert.fail("expected illegal argument");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
   }
 }
 

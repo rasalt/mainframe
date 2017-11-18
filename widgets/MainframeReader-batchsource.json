@@ -17,6 +17,16 @@
           "name": "copybookContents"
         },
         {
+          "name": "replacements",
+          "label": "Text replacements",
+          "description": "Enter placeholders and their replacements in the copybook.",
+          "widget-type": "keyvalue",
+          "widget-attributes": {
+            "delimiter": ",",
+            "kv-delimiter": "="
+          }
+        },
+        {
           "widget-type": "textbox",
           "label": "Binary File Path",
           "name": "binaryFilePath"
