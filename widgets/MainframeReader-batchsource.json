@@ -17,9 +17,28 @@
           "name": "copybookContents"
         },
         {
+          "name": "replacements",
+          "label": "Text replacements",
+          "description": "Enter placeholders and their replacements in the copybook.",
+          "widget-type": "keyvalue",
+          "widget-attributes": {
+            "delimiter": ",",
+            "kv-delimiter": "="
+          }
+        },
+        {
           "widget-type": "textbox",
           "label": "Binary File Path",
           "name": "binaryFilePath"
+        },
+        {
+          "widget-type": "csv",
+          "label": "Fields to keep",
+          "name": "keep",
+          "description": "List of fields to keep. Supersedes Fields to drop.",
+          "widget-attributes": {
+            "delimiter": ","
+          }
         },
         {
           "widget-type": "csv",
@@ -36,8 +55,14 @@
           "name": "maxSplitSize"
         },
         {
+          "widget-type": "textbox",
+          "label": "Code page",
+          "description": "Code page to use, for example, cp037 or cp322. Supersedes the Character set.",
+          "name": "codepage"
+        },
+        {
           "widget-type": "select",
-          "label": "Charset ",
+          "label": "Character set. Pick one of these, or specify the Code page directly.",
           "name": "charset",
           "widget-attributes": {
             "values": [
