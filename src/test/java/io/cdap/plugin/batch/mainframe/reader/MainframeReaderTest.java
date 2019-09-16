@@ -14,33 +14,34 @@
  * the License.
  */
 
-package co.cask.hydrator.plugin.batch;
+package io.cdap.plugin.batch.mainframe.reader;
 
-import co.cask.cdap.api.artifact.ArtifactVersion;
-import co.cask.cdap.api.data.format.StructuredRecord;
-import co.cask.cdap.api.data.schema.Schema;
-import co.cask.cdap.api.dataset.table.Table;
-import co.cask.cdap.etl.api.batch.BatchSource;
-import co.cask.cdap.etl.batch.ETLBatchApplication;
-import co.cask.cdap.etl.batch.mapreduce.ETLMapReduce;
-import co.cask.cdap.etl.mock.batch.MockSink;
-import co.cask.cdap.etl.mock.test.HydratorTestBase;
-import co.cask.cdap.etl.proto.v2.ETLBatchConfig;
-import co.cask.cdap.etl.proto.v2.ETLPlugin;
-import co.cask.cdap.etl.proto.v2.ETLStage;
-import co.cask.cdap.proto.Id;
-import co.cask.cdap.proto.artifact.AppRequest;
-import co.cask.cdap.proto.artifact.ArtifactSummary;
-import co.cask.cdap.proto.id.ArtifactId;
-import co.cask.cdap.proto.id.NamespaceId;
-import co.cask.cdap.test.ApplicationManager;
-import co.cask.cdap.test.DataSetManager;
-import co.cask.cdap.test.MapReduceManager;
-import co.cask.cdap.test.TestConfiguration;
-import co.cask.hydrator.common.Constants;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.cdap.cdap.api.artifact.ArtifactSummary;
+import io.cdap.cdap.api.artifact.ArtifactVersion;
+import io.cdap.cdap.api.data.format.StructuredRecord;
+import io.cdap.cdap.api.data.schema.Schema;
+import io.cdap.cdap.api.dataset.table.Table;
+import io.cdap.cdap.datapipeline.DataPipelineApp;
+import io.cdap.cdap.datapipeline.SmartWorkflow;
+import io.cdap.cdap.etl.api.batch.BatchSource;
+import io.cdap.cdap.etl.mock.batch.MockSink;
+import io.cdap.cdap.etl.mock.test.HydratorTestBase;
+import io.cdap.cdap.etl.proto.v2.ETLBatchConfig;
+import io.cdap.cdap.etl.proto.v2.ETLPlugin;
+import io.cdap.cdap.etl.proto.v2.ETLStage;
+import io.cdap.cdap.proto.ProgramRunStatus;
+import io.cdap.cdap.proto.artifact.AppRequest;
+import io.cdap.cdap.proto.id.ApplicationId;
+import io.cdap.cdap.proto.id.ArtifactId;
+import io.cdap.cdap.proto.id.NamespaceId;
+import io.cdap.cdap.test.ApplicationManager;
+import io.cdap.cdap.test.DataSetManager;
+import io.cdap.cdap.test.TestConfiguration;
+import io.cdap.cdap.test.WorkflowManager;
+import io.cdap.plugin.common.Constants;
 import net.sf.JRecord.Common.RecordException;
 import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.LayoutDetail;
@@ -71,7 +72,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
- * Unit test for {@link co.cask.hydrator.plugin.batch.MainframeSource} classes.
+ * Unit test for {@link MainframeSource} classes.
  */
 
 public class MainframeReaderTest extends HydratorTestBase {
@@ -79,7 +80,7 @@ public class MainframeReaderTest extends HydratorTestBase {
   @ClassRule
   public static final TestConfiguration CONFIG = new TestConfiguration("explore.enabled", false);
 
-  private static final ArtifactVersion CURRENT_VERSION = new ArtifactVersion("3.4.0-SNAPSHOT");
+  private static final ArtifactVersion CURRENT_VERSION = new ArtifactVersion("6.0.0-SNAPSHOT");
   private static final ArtifactId BATCH_APP_ARTIFACT_ID =
     NamespaceId.DEFAULT.artifact("etlbatch", CURRENT_VERSION.getVersion());
   private static final ArtifactSummary ETLBATCH_ARTIFACT =
@@ -174,7 +175,7 @@ public class MainframeReaderTest extends HydratorTestBase {
 
   @BeforeClass
   public static void setupTest() throws Exception {
-    setupBatchArtifacts(BATCH_APP_ARTIFACT_ID, ETLBatchApplication.class);
+    setupBatchArtifacts(BATCH_APP_ARTIFACT_ID, DataPipelineApp.class);
     // add artifact for batch sources and sinks
     addPluginArtifact(NamespaceId.DEFAULT.artifact("copybookreader-plugins", "1.0.0"), BATCH_APP_ARTIFACT_ID,
                       MainframeSource.class);
@@ -188,37 +189,37 @@ public class MainframeReaderTest extends HydratorTestBase {
 
   @Test
   public void testCopybookReaderWithDropOrKeep() throws Exception {
-    testCopybookReaderWithFields(COPYBOOK_CONTENTS, null, null, ALL_FIELDS);
-    testCopybookReaderWithFields(COPYBOOK_CONTENTS, null, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO",
+    testCopybookReaderWithFields("test_1", COPYBOOK_CONTENTS, null, null, ALL_FIELDS);
+    testCopybookReaderWithFields("test_2", COPYBOOK_CONTENTS, null, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO",
                                  ImmutableSet.of("DTAR020_DEPT_NO", "DTAR020_QTY_SOLD", "DTAR020_SALE_PRICE"));
-    testCopybookReaderWithFields(COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO", null,
+    testCopybookReaderWithFields("test_3", COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE,DTAR020_STORE_NO", null,
                                  ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE", "DTAR020_STORE_NO"));
-    testCopybookReaderWithFields(COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE", "DTAR020_DATE",
+    testCopybookReaderWithFields("test_4", COPYBOOK_CONTENTS, "DTAR020_KEYCODE_NO,DTAR020_DATE", "DTAR020_DATE",
                                  ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE"));
   }
 
   @Test
   public void testCopybookReaderWithReplacements() throws Exception {
-    testCopybookReaderWithFields(COPYBOOK_CONTENTS,
+    testCopybookReaderWithFields("test_5", COPYBOOK_CONTENTS,
                                  ":PREFIX:=DTAR020, :COMP:=COMP-3",
                                  "DTAR020_KEYCODE_NO,DTAR020_DATE", "DTAR020_DATE",
                                  ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_DATE"));
   }
 
-  @Test
+  @Test(expected = IllegalStateException.class)
   public void testCopybookReaderWithRedefines() throws Exception {
-    testCopybookReaderWithFields(COPYBOOK_WITH_REDEFINE,
+    testCopybookReaderWithFields("test_6", COPYBOOK_WITH_REDEFINE,
                                  "DTAR020_KEYCODE_NO,DTAR020_STORE_NO,DTAR020_KCODE_STRING", null,
                                  ImmutableSet.of("DTAR020_KEYCODE_NO", "DTAR020_STORE_NO", "DTAR020_KCODE_STRING"));
   }
 
-  public void testCopybookReaderWithFields(String copybook,
+  public void testCopybookReaderWithFields(String testName, String copybook,
                                            @Nullable String keep, @Nullable String drop,
                                            Set<String> expectedFields) throws Exception {
-    testCopybookReaderWithFields(copybook, null, keep, drop, expectedFields);
+    testCopybookReaderWithFields(testName, copybook, null, keep, drop, expectedFields);
   }
 
-  public void testCopybookReaderWithFields(String copybook, String replacements,
+  public void testCopybookReaderWithFields(String testName, String copybook, String replacements,
                                            @Nullable String keep, @Nullable String drop,
                                            Set<String> expectedFields) throws Exception {
 
@@ -251,12 +252,12 @@ public class MainframeReaderTest extends HydratorTestBase {
       .build();
 
     AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(ETLBATCH_ARTIFACT, etlConfig);
-    Id.Application appId = Id.Application.from(Id.Namespace.DEFAULT, "MainframeReaderTest");
+    ApplicationId appId = NamespaceId.DEFAULT.app("MainframeReaderTest_" + testName);
     ApplicationManager appManager = deployApplication(appId, appRequest);
 
-    MapReduceManager mrManager = appManager.getMapReduceManager(ETLMapReduce.NAME);
-    mrManager.start();
-    mrManager.waitForFinish(5, TimeUnit.MINUTES);
+    WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
+    workflowManager.start();
+    workflowManager.waitForRun(ProgramRunStatus.COMPLETED, 5, TimeUnit.MINUTES);
 
     DataSetManager<Table> outputManager = getDataset(outputDatasetName);
     List<StructuredRecord> output = MockSink.readOutput(outputManager);
@@ -313,12 +314,12 @@ public class MainframeReaderTest extends HydratorTestBase {
       .build();
 
     AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(ETLBATCH_ARTIFACT, etlConfig);
-    Id.Application appId = Id.Application.from(Id.Namespace.DEFAULT, "MainframeReaderTest");
+    ApplicationId appId = NamespaceId.DEFAULT.app("MainframeReaderTest_test_7");
     ApplicationManager appManager = deployApplication(appId, appRequest);
 
-    MapReduceManager mrManager = appManager.getMapReduceManager(ETLMapReduce.NAME);
-    mrManager.start();
-    mrManager.waitForFinish(5, TimeUnit.MINUTES);
+    WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
+    workflowManager.start();
+    workflowManager.waitForRun(ProgramRunStatus.COMPLETED, 5, TimeUnit.MINUTES);
 
     DataSetManager<Table> outputManager = getDataset(outputDatasetName);
     List<StructuredRecord> output = MockSink.readOutput(outputManager);
@@ -355,7 +356,7 @@ public class MainframeReaderTest extends HydratorTestBase {
       .build();
 
     AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(ETLBATCH_ARTIFACT, etlConfig);
-    Id.Application appId = Id.Application.from(Id.Namespace.DEFAULT, "MainframeReaderTest");
+    ApplicationId appId = NamespaceId.DEFAULT.app("MainframeReaderTest_test_8");
     try {
       deployApplication(appId, appRequest);
       Assert.fail();
@@ -427,12 +428,12 @@ public class MainframeReaderTest extends HydratorTestBase {
       .build();
 
     AppRequest<ETLBatchConfig> appRequest = new AppRequest<>(ETLBATCH_ARTIFACT, etlConfig);
-    Id.Application appId = Id.Application.from(Id.Namespace.DEFAULT, "MainframeReaderTest");
+    ApplicationId appId = NamespaceId.DEFAULT.app("MainframeReaderTest_test_9");
     ApplicationManager appManager = deployApplication(appId, appRequest);
 
-    MapReduceManager mrManager = appManager.getMapReduceManager(ETLMapReduce.NAME);
-    mrManager.start();
-    mrManager.waitForFinish(20, TimeUnit.MINUTES);
+    WorkflowManager workflowManager = appManager.getWorkflowManager(SmartWorkflow.NAME);
+    workflowManager.start();
+    workflowManager.waitForRun(ProgramRunStatus.COMPLETED, 5, TimeUnit.MINUTES);
 
     DataSetManager<Table> outputManager = getDataset(outputDatasetName);
     List<StructuredRecord> output = MockSink.readOutput(outputManager);
@@ -440,10 +441,10 @@ public class MainframeReaderTest extends HydratorTestBase {
     StructuredRecord record = output.get(0);
 
     Assert.assertEquals("1", record.get("DTAR020_KEYCODE"));
-    Assert.assertEquals(123, record.get("DTAR020_NUM_RIGHTJUSTIFIED"));
-    Assert.assertEquals(20L, record.get("DTAR020_STORE_NO"));
+    Assert.assertEquals(123, (int) record.get("DTAR020_NUM_RIGHTJUSTIFIED"));
+    Assert.assertEquals(20L, (long) record.get("DTAR020_STORE_NO"));
     Assert.assertEquals(20140202, (Double) record.get("DTAR020_DATE"), 0);
-    Assert.assertEquals(100L, record.get("DTAR020_DEPT_NO"));
+    Assert.assertEquals(100L, (long) record.get("DTAR020_DEPT_NO"));
     Assert.assertEquals(7, (Double) record.get("DTAR020_QTY_SOLD"), 0);
     Assert.assertEquals(7.15F, (Float) record.get("DTAR020_SALE_PRICE"), 0);
     Assert.assertEquals(7.30, (Double) record.get("DTAR020_MRP"), 0);
