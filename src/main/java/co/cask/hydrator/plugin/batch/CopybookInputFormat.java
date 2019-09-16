@@ -29,8 +29,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -40,7 +38,6 @@ import java.util.LinkedHashMap;
  */
 public class CopybookInputFormat extends FileInputFormat<LongWritable, LinkedHashMap<String, AbstractFieldValue>> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CopybookInputFormat.class);
 
   public static final String COPYBOOK_INPUTFORMAT_CBL_CONTENTS = "copybook.inputformat.cbl.contents";
 
@@ -74,6 +71,6 @@ public class CopybookInputFormat extends FileInputFormat<LongWritable, LinkedHas
     Configuration conf = context.getConfiguration();
     Path path = new Path(conf.get(COPYBOOK_INPUTFORMAT_DATA_HDFS_PATH));
     final CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(path);
-    return (null == codec) ? true : codec instanceof SplittableCompressionCodec;
+    return (null == codec) || codec instanceof SplittableCompressionCodec;
   }
 }
