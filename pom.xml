@@ -66,11 +66,12 @@
   <issueManagement>
     <url>https://issues.cask.co</url>
   </issueManagement>
+
   <properties>
-    <jrecord.version>0.80.8</jrecord.version>
-    <cb2xml.version>0.80.8-jrecord</cb2xml.version>
+    <jrecord.version>0.90.2</jrecord.version>
+    <cb2xml.version>0.90.2</cb2xml.version>
     <main.basedir>${project.basedir}</main.basedir>
-    <cdap.version>6.1.0-SNAPSHOT</cdap.version>
+    <cdap.version>6.1.1</cdap.version>
     <guava.version>19.0</guava.version>
     <hadoop.version>2.3.0</hadoop.version>
     <hydrator.version>2.2.0</hydrator.version>
@@ -127,14 +128,14 @@
       <artifactId>JRecord</artifactId>
       <version>${jrecord.version}</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/repo/JRecord-0.80.8.jar</systemPath>
+      <systemPath>${project.basedir}/repo/JRecord.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>net.sf.cb2xml</groupId>
       <artifactId>cb2xml</artifactId>
       <version>${cb2xml.version}</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/repo/cb2xml-0.80.8-jrecord.jar</systemPath>
+      <systemPath>${project.basedir}/repo/cb2xml.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
