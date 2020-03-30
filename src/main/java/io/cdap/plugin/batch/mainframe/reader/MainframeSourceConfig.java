@@ -146,8 +146,8 @@ public class MainframeSourceConfig extends ReferencePluginConfig {
   @VisibleForTesting
   String replacements;
 
-  public MainframeSourceConfig(String referenceName, String binaryFilePath, String copybookContents, String drop, String keep,
-                               Long maxSplitSize, String codepage, String charset, String replacements) {
+  public MainframeSourceConfig(String referenceName, String binaryFilePath, String copybookContents, String drop,
+                               String keep, Long maxSplitSize, String codepage, String charset, String replacements) {
     super(referenceName);
     this.binaryFilePath = binaryFilePath;
     this.copybookContents = copybookContents;

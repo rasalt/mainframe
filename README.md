@@ -33,14 +33,18 @@ CDAP version 6.1.x or higher.
   
 Building Plugins
 ----------------
-You get started with Mainframe reader plugins by building directly from the latest source code::
+You get started with Mainframe reader plugins by building directly from the latest source code. However, you need to 
+download the JRecord and cb2xml libraries from [sourceforge](https://sourceforge.net/projects/jrecord/) and place them 
+the ``repo`` directory before building the plugin. This is because these libraries are not yet available through the 
+public maven repository at Maven Central. The plugin is currently tested with version 0.90.2 of the JRecord library, so 
+please download that version. 
 
-  git clone https://github.com/hydrator/mainframe-reader.git
-  cd mainframe-reader
-  mvn clean package
+    $ git clone https://github.com/data-integrations/mainframe-reader.git
+    $ cd mainframe-reader
+    <Download and place the JRecord libraries in the repo/ directory>
+    $ mvn clean package
 
-After the build completes, you will have a JAR for each plugin under each
-``<plugin-name>/target/`` directory.
+After the build completes, you will have a JAR for the plugin under each ``target/`` directory.
 
 Deploying Plugins
 -----------------
