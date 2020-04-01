@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2016-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -124,8 +124,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
 
   @Override
   public void transform(KeyValue<LongWritable, Map<String, AbstractFieldValue>> input,
-                        Emitter<StructuredRecord> emitter)
-    throws Exception {
+                        Emitter<StructuredRecord> emitter) {
 
 
     Map<String, AbstractFieldValue> values = Maps.newHashMap();
@@ -134,22 +133,33 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     }
 
     StructuredRecord.Builder builder = StructuredRecord.builder(outputSchema);
-    for (Schema.Field field : outputSchema.getFields()) {
+
+    List<Schema.Field> fields = outputSchema.getFields();
+    if (fields == null || fields.isEmpty()) {
+      return;
+    }
+
+    for (Schema.Field field : fields) {
       String fieldName = field.getName();
       if (values.containsKey(fieldName)) {
         try {
           builder.set(fieldName, getFieldValue(values.get(fieldName)));
         } catch (Exception e) {
+          Schema schema = field.getSchema();
+          String displayName = schema.getDisplayName();
+          if (schema.isSimpleOrNullableSimple()) {
+            displayName = schema.getNonNullable().getDisplayName();
+          }
           throw new IllegalArgumentException(String.format(
-            "Unable to extract value for field '%s' in record at offset %d: %s",
-            fieldName, input.getKey().get(), e.getMessage()));
+            "Unable to extract value for field '%s' in record at offset %d as %s: %s",
+            fieldName, input.getKey().get(), displayName, e.getMessage()));
         }
       }
     }
     emitter.emit(builder.build());
   }
 
-  class GetSchemaRequest {
+  static class GetSchemaRequest {
     public String copybookContents;
   }
 
@@ -201,31 +211,60 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
    * @param value AbstractFieldValue object to be converted in the JAVA primitive data types
    * @return data objects supported by CDAP
    */
+  @Nullable
   private Object getFieldValue(@Nullable AbstractFieldValue value) {
     if (value == null) {
       return null;
     }
     int type = value.getFieldDetail().getType();
+    Object parsedValue = value.asString();
     switch (type) {
-      case 0:
-        return value.asString();
       case 17:
-        return value.asFloat();
+        try {
+          parsedValue = value.asFloat();
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+            String.format("Cannot convert non-numeric data %s to a float.", parsedValue)
+          );
+        }
+        break;
       case 18:
       case 22:
       case 31:
       case 32:
       case 33:
-        return value.asDouble();
+        try {
+          parsedValue = value.asDouble();
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+            String.format("Cannot convert non-numeric data %s to a double.", parsedValue)
+          );
+        }
+        break;
       case 25:
-        return value.asInt();
+        try {
+          parsedValue = value.asInt();
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+            String.format("Cannot convert non-numeric data %s to an integer.", parsedValue)
+          );
+        }
+        break;
       case 35:
       case 36:
       case 39:
-        return value.asLong();
+        try {
+          parsedValue = value.asLong();
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+            String.format("Cannot convert non-numeric data %s to a long.", parsedValue)
+          );
+        }
+        break;
       default:
-        return value.asString();
+        parsedValue = value.asString();
     }
+    return parsedValue;
   }
 
 }
