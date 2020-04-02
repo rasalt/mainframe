@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2016-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -88,8 +88,11 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
       end = start + fileSplit.getLength();
 
       BufferedInputStream fileIn = new BufferedInputStream(fs.open(fileSplit.getPath()));
-      // Jump to the point in the split at which the first complete record of the split starts,
       // if not the first InputSplit
+      // Jump to the point in the split at which the first complete record of the split starts
+      // To get to this, obtain the length of the first record which could be partial
+      // The length of this partial record is obtained as:
+      // [length of record] - [portion of the record which was included in the last split]
       if (start != 0) {
         position = start - (start % recordByteLength) + recordByteLength;
         fileIn.skip(position);

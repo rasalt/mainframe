@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2016-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -17,12 +17,8 @@
 package io.cdap.plugin.batch.mainframe.reader;
 
 import net.sf.JRecord.Common.AbstractFieldValue;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.CompressionCodecFactory;
-import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -68,9 +64,12 @@ public class CopybookInputFormat extends FileInputFormat<LongWritable, LinkedHas
 
   @Override
   protected boolean isSplitable(JobContext context, Path file) {
-    Configuration conf = context.getConfiguration();
-    Path path = new Path(conf.get(COPYBOOK_INPUTFORMAT_DATA_HDFS_PATH));
-    final CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(path);
-    return (null == codec) || codec instanceof SplittableCompressionCodec;
+//    TODO: PLUGIN-126: Implement custom splitting logic. Before that is fixed, the inputformat cannot be splittable,
+//    else it can cause data corruption and loss.
+//    Configuration conf = context.getConfiguration();
+//    Path path = new Path(conf.get(COPYBOOK_INPUTFORMAT_DATA_HDFS_PATH));
+//    final CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(path);
+//    return (null == codec) || codec instanceof SplittableCompressionCodec;
+    return false;
   }
 }
