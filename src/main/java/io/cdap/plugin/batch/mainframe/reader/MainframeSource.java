@@ -17,7 +17,7 @@ package io.cdap.plugin.batch.mainframe.reader;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.Maps;
+import com.google.gson.Gson;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -27,6 +27,7 @@ import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.dataset.lib.KeyValue;
 import io.cdap.cdap.etl.api.Emitter;
 import io.cdap.cdap.etl.api.FailureCollector;
+import io.cdap.cdap.etl.api.InvalidEntry;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.batch.BatchRuntimeContext;
 import io.cdap.cdap.etl.api.batch.BatchSource;
@@ -48,8 +49,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.Path;
@@ -65,9 +66,26 @@ import javax.ws.rs.Path;
 @Plugin(type = BatchSource.PLUGIN_TYPE)
 @Name("MainframeReader")
 @Description("Batch Source to read Mainframe fixed-length flat files")
-public class MainframeSource extends BatchSource<LongWritable, Map<String, AbstractFieldValue>, StructuredRecord> {
+public class MainframeSource
+  extends BatchSource<LongWritable, LinkedHashMap<String, AbstractFieldValue>, StructuredRecord> {
 
   private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);
+  private static final Gson GSON = new Gson();
+  private static final List<Schema.Field> ERROR_FIELDS = new ArrayList<>();
+//  private static final String ERROR_KEY_FIELD = "key";
+//  private static final String ERROR_TEXT_VALUE_FIELD = "textValue";
+//  private static final String ERROR_ORIGINAL_TYPE_FIELD = "originalType";
+//  private static final String ERROR_MESSAGE_FIELD = "errorMessage";
+  private static final String ERROR_FIELD = "parsingError";
+
+  static {
+//    ERROR_FIELDS.add(Schema.Field.of(ERROR_KEY_FIELD, Schema.of(Schema.Type.STRING)));
+//    ERROR_FIELDS.add(Schema.Field.of(ERROR_TEXT_VALUE_FIELD, Schema.of(Schema.Type.STRING)));
+//    ERROR_FIELDS.add(Schema.Field.of(ERROR_ORIGINAL_TYPE_FIELD, Schema.of(Schema.Type.STRING)));
+//    ERROR_FIELDS.add(Schema.Field.of(ERROR_MESSAGE_FIELD, Schema.nullableOf(Schema.of(Schema.Type.STRING))));
+    ERROR_FIELDS.add(Schema.Field.of(ERROR_FIELD, Schema.of(Schema.Type.STRING)));
+  }
+  private static final Schema ERROR_SCHEMA = Schema.recordOf("errorRecord", ERROR_FIELDS);
 
   private final MainframeSourceConfig config;
   private Schema outputSchema;
@@ -96,9 +114,9 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
   }
 
-  private String normalizeFieldName(String fieldName) {
-    return fieldName.replace("-", "_");
-  }
+//  private String normalizeFieldName(String fieldName) {
+//    return fieldName.replace("-", "_");
+//  }
 
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
@@ -114,36 +132,56 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   }
 
   @Override
-  public void transform(KeyValue<LongWritable, Map<String, AbstractFieldValue>> input,
+  public void transform(KeyValue<LongWritable, LinkedHashMap<String, AbstractFieldValue>> input,
                         Emitter<StructuredRecord> emitter) {
 
 
-    Map<String, AbstractFieldValue> values = Maps.newHashMap();
-    for (Map.Entry<String, AbstractFieldValue> entry : input.getValue().entrySet()) {
-      values.put(normalizeFieldName(entry.getKey()), entry.getValue());
-    }
+//    Map<String, AbstractFieldValue> values = new LinkedHashMap<>();
+//    for (Map.Entry<String, AbstractFieldValue> entry : input.getValue().entrySet()) {
+//      values.put(normalizeFieldName(entry.getKey()), entry.getValue());
+//    }
 
     StructuredRecord.Builder builder = StructuredRecord.builder(outputSchema);
+    StructuredRecord.Builder errorBuilder = StructuredRecord.builder(ERROR_SCHEMA);
 
     List<Schema.Field> fields = outputSchema.getFields();
     if (fields == null || fields.isEmpty()) {
       return;
     }
 
+    LinkedHashMap<String, AbstractFieldValue> values = input.getValue();
+    List<ParsingError> parsingErrors = new ArrayList<>();
+    int numParsingErrors = 0;
     for (Schema.Field field : fields) {
       String fieldName = field.getName();
       if (values.containsKey(fieldName)) {
+        Schema schema = field.getSchema();
+        schema = schema.isNullable() ? schema.getNonNullable() : schema;
+        String displayName = schema.getDisplayName();
+        AbstractFieldValue fieldValue = values.get(fieldName);
+        ParsingError error = new ParsingError(fieldName, fieldValue.asString(), displayName);
         try {
-          builder.set(fieldName, getFieldValue(values.get(fieldName)));
+          builder.set(fieldName, getFieldValue(fieldValue));
+//          errorBuilder.set(ERROR_KEY_FIELD, fieldName);
+//          errorBuilder.set(ERROR_TEXT_VALUE_FIELD, fieldValue.asString());
+//          errorBuilder.set(ERROR_ORIGINAL_TYPE_FIELD, displayName);
+//          errorBuilder.set(ERROR_MESSAGE_FIELD, null);
         } catch (Exception e) {
-          Schema schema = field.getSchema();
-          schema = schema.isNullable() ? schema.getNonNullable() : schema;
-          String displayName = schema.getDisplayName();
-          throw new IllegalArgumentException(String.format(
+          numParsingErrors++;
+          error.setErrorMessage(String.format(
             "Unable to extract value for field '%s' in record at offset %d as %s: %s",
             fieldName, input.getKey().get(), displayName, e.getMessage()));
+//          errorBuilder.set(ERROR_MESSAGE_FIELD, String.format(
+//            "Unable to extract value for field '%s' in record at offset %d as %s: %s",
+//            fieldName, input.getKey().get(), displayName, e.getMessage()));
         }
+        parsingErrors.add(error);
+        errorBuilder.set(ERROR_FIELD, GSON.toJson(parsingErrors));
       }
+    }
+    if (numParsingErrors > 0) {
+      emitter.emitError(new InvalidEntry<>(101, "Parsing errors while parsing EBCDIC record. Review the attached " +
+        "error record for details.", errorBuilder.build()));
     }
     emitter.emit(builder.build());
   }
@@ -167,11 +205,13 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     if (!Strings.isNullOrEmpty(config.getKeep())) {
       fieldsToKeep = new HashSet<>();
       Splitter.on(",").trimResults().split(config.getKeep())
-        .forEach(keepField -> fieldsToKeep.add(normalizeFieldName(keepField)));
+//        .forEach(keepField -> fieldsToKeep.add(normalizeFieldName(keepField)));
+        .forEach(keepField -> fieldsToKeep.add(keepField));
     } else if (!Strings.isNullOrEmpty(config.getDrop())) {
       fieldsToDrop = new HashSet<>();
       Splitter.on(",").trimResults().split(config.getDrop())
-        .forEach(dropField -> fieldsToDrop.add(normalizeFieldName(dropField)));
+        .forEach(dropField -> fieldsToDrop.add(dropField));
+//        .forEach(dropField -> fieldsToDrop.add(normalizeFieldName(dropField)));
     }
 
     InputStream inputStream;
@@ -183,7 +223,8 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
       externalRecord = CopybookIOUtils.getExternalRecord(bufferedInputStream, font);
       String fieldName;
       for (ExternalField field : externalRecord.getRecordFields()) {
-        fieldName = normalizeFieldName(field.getName());
+//        fieldName = normalizeFieldName(field.getName());
+        fieldName = field.getName();
         if (fieldsToKeep != null && !fieldsToKeep.contains(fieldName)) {
             continue;
         }
@@ -266,4 +307,22 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     return parsedValue;
   }
 
+  private static class ParsingError {
+    private final String fieldName;
+    private final String textValue;
+    private final String originalType;
+    @Nullable
+    private String errorMessage;
+
+    ParsingError(String fieldName, String textValue, String originalType) {
+      this.fieldName = fieldName;
+      this.textValue = textValue;
+      this.originalType = originalType;
+      this.errorMessage = null;
+    }
+
+    private void setErrorMessage(String errorMessage) {
+      this.errorMessage = errorMessage;
+    }
+  }
 }

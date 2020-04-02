@@ -1,7 +1,8 @@
 {
   "metadata": {
-    "spec-version": "1.5"
+    "spec-version": "1.6"
   },
+  "emit-errors": true,
   "configuration-groups": [
     {
       "label": "Mainframe Reader Configuration",
