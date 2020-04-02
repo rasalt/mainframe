@@ -21,7 +21,6 @@ import net.sf.JRecord.Common.AbstractFieldValue;
 import net.sf.JRecord.Common.BasicFileSchema;
 import net.sf.JRecord.Common.CommonBits;
 import net.sf.JRecord.Common.Constants;
-import net.sf.JRecord.Common.IFieldDetail;
 import net.sf.JRecord.Common.RecordException;
 import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.LayoutDetail;
@@ -43,14 +42,12 @@ import org.junit.Test;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 
 public class CopybookIOUtilsTest {
@@ -109,19 +106,9 @@ public class CopybookIOUtilsTest {
     );
     LayoutDetail layout = externalRecord.asLayoutDetail();
 
-
-    Map<String, IFieldDetail> fieldNameMap = layout.getFieldNameMap();
-
-    int recordByteLength = 0;
-    Set<Integer> fieldPositions = new HashSet<>();
-    for (ExternalField field : externalRecord.getRecordFields()) {
-      if (!fieldPositions.contains(field.getPos())) {
-        recordByteLength += field.getLen();
-        fieldPositions.add(field.getPos());
-      }
-    }
-
-    Path path = new Path("/Users/nmotgi/Work/Demo/mainframe/R1Y9PB.FDR.FDRINCR.NETW.DAT.G0999V");
+    URL resource = this.getClass().getClassLoader().getResource("R1Y9PB.FDR.FDRINCR.NETW.DAT.G0999V");
+    Assert.assertNotNull(resource);
+    Path path = new Path(resource.toURI());
     FileSystem fs = FileSystem.get(path.toUri(), new Configuration());
     BufferedInputStream fileIn = new BufferedInputStream(fs.open(path));
 
@@ -129,7 +116,7 @@ public class CopybookIOUtilsTest {
       .getLineReader(BasicFileSchema.newFixedSchema(fileStructure));
     reader.open(fileIn, layout);
 
-    java.nio.file.Path out = Paths.get("/tmp/cobol.test.txt");
+    // Read data in memory in a single string
     AbstractLine line;
     StringBuilder sb = new StringBuilder();
     while ((line = reader.read()) != null) {
@@ -138,13 +125,16 @@ public class CopybookIOUtilsTest {
         AbstractFieldValue fieldValue = line.getFieldValue(field.getName());
         value.put(field.getName(), fieldValue);
       }
-      Iterator<Map.Entry<String, AbstractFieldValue>> iterator = value.entrySet().iterator();
-      while (iterator.hasNext()) {
-        Map.Entry<String, AbstractFieldValue> next = iterator.next();
-        sb.append(next.getValue().asString()).append("|");
+      for (Map.Entry<String, AbstractFieldValue> next : value.entrySet()) {
+        sb.append(next.getKey())
+          .append("=")
+          .append(next.getValue().asString())
+          .append("|");
       }
       sb.append("\n");
     }
+
+    java.nio.file.Path out = Paths.get("/tmp/cobol.test.txt");
     Files.write(out, sb.toString().getBytes());
     reader.close();
     fileIn.close();
