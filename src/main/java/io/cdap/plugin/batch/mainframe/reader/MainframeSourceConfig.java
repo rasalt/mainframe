@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2016-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -18,7 +18,6 @@ package io.cdap.plugin.batch.mainframe.reader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.annotation.Name;
@@ -33,6 +32,7 @@ import org.apache.commons.io.IOUtils;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -298,7 +298,7 @@ public class MainframeSourceConfig extends ReferencePluginConfig {
   }
 
   private void validateSchema(FailureCollector failureCollector) {
-    List<Schema.Field> fields = Lists.newArrayList();
+    List<Schema.Field> fields = new ArrayList<>();
     ExternalRecord externalRecord;
     try (InputStream inputStream = IOUtils.toInputStream(getCopyBookContents(), "UTF-8")) {
       BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
@@ -314,7 +314,6 @@ public class MainframeSourceConfig extends ReferencePluginConfig {
         }
         fields.add(Schema.Field.of(fieldName, Schema.nullableOf(Schema.of(getFieldSchemaType(field.getType())))));
       }
-      Schema.recordOf("record", fields);
     } catch (IOException e) {
       failureCollector.addFailure("Exception while creating input stream for COBOL Copybook.",
                                   "Check COBOL Copybook data.")
@@ -323,6 +322,19 @@ public class MainframeSourceConfig extends ReferencePluginConfig {
     } catch (RecordException e) {
       failureCollector.addFailure("Exception while creating record from COBOL Copybook.",
                                   "Check COBOL Copybook data.")
+        .withConfigProperty(COPYBOOK_CONTENTS)
+        .withStacktrace(e.getStackTrace());
+    }
+    if (fields.isEmpty()) {
+      failureCollector.addFailure("No fields were generated after parsing the COBOL Copybook.",
+                                  "Check COBOL Copybook data and configuration.")
+        .withConfigProperty(COPYBOOK_CONTENTS);
+    }
+    try {
+      Schema.recordOf("mainframe_record", fields);
+    } catch (IllegalArgumentException e) {
+      failureCollector.addFailure("Could not successfully generate a schema by parsing the COBOL Copybook.",
+                                  "Check COBOL Copybook data and configuration.")
         .withConfigProperty(COPYBOOK_CONTENTS)
         .withStacktrace(e.getStackTrace());
     }
