@@ -17,7 +17,6 @@ package io.cdap.plugin.batch.mainframe.reader;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
@@ -47,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -93,15 +93,6 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
   @Override
   public void initialize(BatchRuntimeContext context) throws Exception {
     super.initialize(context);
-    if (!Strings.isNullOrEmpty(config.getKeep())) {
-      fieldsToKeep = new HashSet<>();
-      Splitter.on(",").trimResults().split(config.getKeep())
-        .forEach(keepField -> fieldsToKeep.add(normalizeFieldName(keepField)));
-    } else if (!Strings.isNullOrEmpty(config.getDrop())) {
-      fieldsToDrop = new HashSet<>();
-      Splitter.on(",").trimResults().split(config.getDrop())
-        .forEach(dropField -> fieldsToDrop.add(normalizeFieldName(dropField)));
-    }
     outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
   }
 
@@ -146,10 +137,8 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
           builder.set(fieldName, getFieldValue(values.get(fieldName)));
         } catch (Exception e) {
           Schema schema = field.getSchema();
+          schema = schema.isNullable() ? schema.getNonNullable() : schema;
           String displayName = schema.getDisplayName();
-          if (schema.isSimpleOrNullableSimple()) {
-            displayName = schema.getNonNullable().getDisplayName();
-          }
           throw new IllegalArgumentException(String.format(
             "Unable to extract value for field '%s' in record at offset %d as %s: %s",
             fieldName, input.getKey().get(), displayName, e.getMessage()));
@@ -175,9 +164,19 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
    */
   private Schema getOutputSchema(String copybookContents, String font) {
 
+    if (!Strings.isNullOrEmpty(config.getKeep())) {
+      fieldsToKeep = new HashSet<>();
+      Splitter.on(",").trimResults().split(config.getKeep())
+        .forEach(keepField -> fieldsToKeep.add(normalizeFieldName(keepField)));
+    } else if (!Strings.isNullOrEmpty(config.getDrop())) {
+      fieldsToDrop = new HashSet<>();
+      Splitter.on(",").trimResults().split(config.getDrop())
+        .forEach(dropField -> fieldsToDrop.add(normalizeFieldName(dropField)));
+    }
+
     InputStream inputStream;
     ExternalRecord externalRecord;
-    List<Schema.Field> fields = Lists.newArrayList();
+    List<Schema.Field> fields = new ArrayList<>();
     try {
       inputStream = IOUtils.toInputStream(copybookContents, "UTF-8");
       BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
