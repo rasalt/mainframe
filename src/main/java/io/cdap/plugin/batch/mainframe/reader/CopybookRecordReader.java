@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2016-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -63,7 +63,7 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
 
 
   @Override
-  public void initialize(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
+  public void initialize(InputSplit split, TaskAttemptContext context) throws IOException {
     // Get configuration
     Configuration conf = context.getConfiguration();
     int fileStructure = net.sf.JRecord.Common.Constants.IO_FIXED_LENGTH;
@@ -102,7 +102,7 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
   }
 
   @Override
-  public boolean nextKeyValue() throws IOException, InterruptedException {
+  public boolean nextKeyValue() throws IOException {
     AbstractLine line = reader.read();
     if (line == null) {
       return false;
@@ -125,17 +125,17 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
   }
 
   @Override
-  public LongWritable getCurrentKey() throws IOException, InterruptedException {
+  public LongWritable getCurrentKey() {
     return key;
   }
 
   @Override
-  public LinkedHashMap<String, AbstractFieldValue> getCurrentValue() throws IOException, InterruptedException {
+  public LinkedHashMap<String, AbstractFieldValue> getCurrentValue() {
     return value;
   }
 
   @Override
-  public float getProgress() throws IOException, InterruptedException {
+  public float getProgress() {
     if (start == end) {
       return 0.0f;
     } else {
