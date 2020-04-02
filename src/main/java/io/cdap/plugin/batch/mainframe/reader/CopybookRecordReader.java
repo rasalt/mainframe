@@ -88,8 +88,11 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
       end = start + fileSplit.getLength();
 
       BufferedInputStream fileIn = new BufferedInputStream(fs.open(fileSplit.getPath()));
-      // Jump to the point in the split at which the first complete record of the split starts,
       // if not the first InputSplit
+      // Jump to the point in the split at which the first complete record of the split starts
+      // To get to this, obtain the length of the first record which could be partial
+      // The length of this partial record is obtained as:
+      // [length of record] - [portion of the record which was included in the last split]
       if (start != 0) {
         position = start - (start % recordByteLength) + recordByteLength;
         fileIn.skip(position);
