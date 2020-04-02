@@ -72,17 +72,9 @@ public class MainframeSource
   private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);
   private static final Gson GSON = new Gson();
   private static final List<Schema.Field> ERROR_FIELDS = new ArrayList<>();
-//  private static final String ERROR_KEY_FIELD = "key";
-//  private static final String ERROR_TEXT_VALUE_FIELD = "textValue";
-//  private static final String ERROR_ORIGINAL_TYPE_FIELD = "originalType";
-//  private static final String ERROR_MESSAGE_FIELD = "errorMessage";
   private static final String ERROR_FIELD = "parsingError";
 
   static {
-//    ERROR_FIELDS.add(Schema.Field.of(ERROR_KEY_FIELD, Schema.of(Schema.Type.STRING)));
-//    ERROR_FIELDS.add(Schema.Field.of(ERROR_TEXT_VALUE_FIELD, Schema.of(Schema.Type.STRING)));
-//    ERROR_FIELDS.add(Schema.Field.of(ERROR_ORIGINAL_TYPE_FIELD, Schema.of(Schema.Type.STRING)));
-//    ERROR_FIELDS.add(Schema.Field.of(ERROR_MESSAGE_FIELD, Schema.nullableOf(Schema.of(Schema.Type.STRING))));
     ERROR_FIELDS.add(Schema.Field.of(ERROR_FIELD, Schema.of(Schema.Type.STRING)));
   }
   private static final Schema ERROR_SCHEMA = Schema.recordOf("errorRecord", ERROR_FIELDS);
@@ -161,19 +153,12 @@ public class MainframeSource
         AbstractFieldValue fieldValue = values.get(fieldName);
         ParsingError error = new ParsingError(fieldName, fieldValue.asString(), displayName);
         try {
-          builder.set(fieldName, getFieldValue(fieldValue));
-//          errorBuilder.set(ERROR_KEY_FIELD, fieldName);
-//          errorBuilder.set(ERROR_TEXT_VALUE_FIELD, fieldValue.asString());
-//          errorBuilder.set(ERROR_ORIGINAL_TYPE_FIELD, displayName);
-//          errorBuilder.set(ERROR_MESSAGE_FIELD, null);
+          builder.set(fieldName, parseFieldValue(fieldValue));
         } catch (Exception e) {
           numParsingErrors++;
           error.setErrorMessage(String.format(
             "Unable to extract value for field '%s' in record at offset %d as %s: %s",
             fieldName, input.getKey().get(), displayName, e.getMessage()));
-//          errorBuilder.set(ERROR_MESSAGE_FIELD, String.format(
-//            "Unable to extract value for field '%s' in record at offset %d as %s: %s",
-//            fieldName, input.getKey().get(), displayName, e.getMessage()));
         }
         parsingErrors.add(error);
         errorBuilder.set(ERROR_FIELD, GSON.toJson(parsingErrors));
@@ -252,7 +237,7 @@ public class MainframeSource
    * @return data objects supported by CDAP
    */
   @Nullable
-  private Object getFieldValue(@Nullable AbstractFieldValue value) {
+  private Object parseFieldValue(@Nullable AbstractFieldValue value) {
     if (value == null) {
       return null;
     }
