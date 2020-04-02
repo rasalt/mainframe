@@ -75,11 +75,11 @@ public class CopybookRecordReader extends RecordReader<LongWritable, LinkedHashM
     BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
     try {
       externalRecord = CopybookIOUtils.getExternalRecord(bufferedInputStream, font);
-      recordByteLength = CopybookIOUtils.getRecordLength(externalRecord, fileStructure);
+      recordByteLength = CopybookIOUtils.getRecordLength(externalRecord);
 
       LineProvider lineProvider = LineIOProvider.getInstance().getLineProvider(fileStructure, font);
       reader = LineIOProvider.getInstance().getLineReader(fileStructure, lineProvider);
-      LayoutDetail copybook = CopybookIOUtils.getLayoutDetail(externalRecord);
+      LayoutDetail copybook = externalRecord.asLayoutDetail();
 
       org.apache.hadoop.mapreduce.lib.input.FileSplit fileSplit =
         (org.apache.hadoop.mapreduce.lib.input.FileSplit) split;
