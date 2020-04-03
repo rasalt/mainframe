@@ -13,12 +13,34 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+
 package io.cdap.plugin.mainframe;
 
 import java.io.IOException;
 
+/**
+ * This interface <code>MainframeReader</code> is base interface for retrieving records for fixed and VB files.
+ */
 public interface MainframeReader {
+  /**
+   * Initiialize the mainframe reader.
+   *
+   * @param provider Confiuguration provider.
+   * @throws IOException thrown when there are issues reading the file.
+   */
   void initialize(ConfigProvider provider) throws IOException;
+
+  /**
+   * Retrieves one record from the mainframe file.
+   *
+   * @return a instance of <code>Record</code>
+   * @throws IOException thrown when there are issues reading records.
+   */
   MainframeRecord getRecord() throws IOException;
+
+  /**
+   *
+   * @throws IOException
+   */
   void close() throws IOException;
 }

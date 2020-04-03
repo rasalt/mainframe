@@ -334,7 +334,7 @@
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <_exportcontents>io.cdap.plugin.batch.mainframe.reader.*</_exportcontents>
+            <_exportcontents>io.cdap.plugin.mainframe.*</_exportcontents>
             <Embed-Dependency>*;inline=false;scope=compile|system</Embed-Dependency>
             <Embed-Transitive>true</Embed-Transitive>
             <Embed-Directory>lib</Embed-Directory>

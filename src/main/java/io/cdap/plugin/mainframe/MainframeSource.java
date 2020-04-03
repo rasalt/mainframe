@@ -15,9 +15,6 @@
  */
 package io.cdap.plugin.mainframe;
 
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -26,33 +23,18 @@ import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.dataset.lib.KeyValue;
 import io.cdap.cdap.etl.api.Emitter;
-import io.cdap.cdap.etl.api.FailureCollector;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.batch.BatchRuntimeContext;
 import io.cdap.cdap.etl.api.batch.BatchSource;
 import io.cdap.cdap.etl.api.batch.BatchSourceContext;
-import io.cdap.plugin.batch.mainframe.reader.CopybookIOUtils;
-import io.cdap.plugin.batch.mainframe.reader.MainframeSourceConfig;
 import io.cdap.plugin.common.SourceInputFormatProvider;
 import io.cdap.plugin.common.batch.JobUtils;
-import net.sf.JRecord.Common.AbstractFieldValue;
-import net.sf.JRecord.Common.RecordException;
-import net.sf.JRecord.External.Def.ExternalField;
-import net.sf.JRecord.External.ExternalRecord;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import javax.annotation.Nullable;
-import javax.ws.rs.Path;
 
 /**
  * Batch source to poll fixed-length flat files that can be parsed using a COBOL copybook.
@@ -64,41 +46,33 @@ import javax.ws.rs.Path;
  */
 @Plugin(type = BatchSource.PLUGIN_TYPE)
 @Name("Mainframe")
-@Description("Read EBCDIC mainframe fixed length and variable length record files")
+@Description("Read EBCDIC mainframe fixed length and variable length record files.")
 public class MainframeSource extends BatchSource<LongWritable, MainframeRecord, StructuredRecord> {
   private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);
-  private final MainframeSourceConfig config;
+  private final Config config;
   private Schema outputSchema;
-  private Set<String> fieldsToKeep;
-  private Set<String> fieldsToDrop;
 
-  public MainframeSource(MainframeSourceConfig mainframeSourceConfig) {
-    this.config = mainframeSourceConfig;
+  public MainframeSource(Config config) {
+    this.config = config;
   }
 
   @Override
   public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
     super.configurePipeline(pipelineConfigurer);
-    FailureCollector failureCollector = pipelineConfigurer.getStageConfigurer().getFailureCollector();
-    config.validate(failureCollector);
-    failureCollector.getOrThrowException();
-    outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
+    CopybookToSchema copybookToSchema = new CopybookToSchema(config.getCopyBookContents(), config.getFont());
+    try {
+      outputSchema = copybookToSchema.getSchema(true);
+    } catch (IOException e) {
+      throw new IllegalArgumentException(e.getMessage(), e);
+    }
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
 
   @Override
   public void initialize(BatchRuntimeContext context) throws Exception {
     super.initialize(context);
-    if (!Strings.isNullOrEmpty(config.getKeep())) {
-      fieldsToKeep = new HashSet<>();
-      Splitter.on(",").trimResults().split(config.getKeep())
-        .forEach(keepField -> fieldsToKeep.add(Datum.normalizeFieldName(keepField)));
-    } else if (!Strings.isNullOrEmpty(config.getDrop())) {
-      fieldsToDrop = new HashSet<>();
-      Splitter.on(",").trimResults().split(config.getDrop())
-        .forEach(dropField -> fieldsToDrop.add(Datum.normalizeFieldName(dropField)));
-    }
-    outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
+    CopybookToSchema copybookToSchema = new CopybookToSchema(config.getCopyBookContents(), config.getFont());
+    outputSchema = copybookToSchema.getSchema(true);
   }
 
   @Override
@@ -135,84 +109,4 @@ public class MainframeSource extends BatchSource<LongWritable, MainframeRecord, 
     }
     emitter.emit(builder.build());
   }
-
-  class GetSchemaRequest {
-    public String copybookContents;
-  }
-
-  @Path("outputSchema")
-  public Schema getSchema(GetSchemaRequest request) {
-      return getOutputSchema(request.copybookContents, MainframeSourceConfig.DEFAULT_FONT);
-  }
-
-  /**
-   * Get the output schema from the COBOL copybook contents specified by the user.
-   *
-   * @return outputSchema
-   */
-  private Schema getOutputSchema(String copybookContents, String font) {
-
-    InputStream inputStream;
-    ExternalRecord externalRecord;
-    List<Schema.Field> fields = Lists.newArrayList();
-    try {
-      inputStream = IOUtils.toInputStream(copybookContents, "UTF-8");
-      BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-      externalRecord = CopybookIOUtils.getExternalRecord(bufferedInputStream, font);
-      String fieldName;
-      for (ExternalField field : externalRecord.getRecordFields()) {
-        fieldName = Datum.normalizeFieldName(field.getName());
-        if (fieldsToKeep != null && !fieldsToKeep.contains(fieldName)) {
-            continue;
-        }
-        if (fieldsToDrop != null && fieldsToDrop.contains(fieldName)) {
-          continue;
-        }
-        fields.add(Schema.Field.of(fieldName, Schema.nullableOf(
-          Schema.of(Schema.Type.STRING))));
-      }
-      return Schema.recordOf("record", fields);
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Exception while creating input stream for COBOL Copybook. Invalid output " +
-                                           "schema: " + e.getMessage(), e);
-    } catch (RecordException e) {
-      throw new IllegalArgumentException("Exception while creating record from COBOL Copybook. Invalid output " +
-                                           "schema: " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * Get the field values for the fields in the required format.
-   * Date will be returned in the format - "yyyy-MM-dd".
-   *
-   * @param value AbstractFieldValue object to be converted in the JAVA primitive data types
-   * @return data objects supported by CDAP
-   */
-  private Object getFieldValue(@Nullable AbstractFieldValue value) {
-    if (value == null) {
-      return null;
-    }
-    int type = value.getFieldDetail().getType();
-    switch (type) {
-      case 0:
-        return value.asString();
-      case 17:
-        return value.asFloat();
-      case 18:
-      case 22:
-      case 31:
-      case 32:
-      case 33:
-        return value.asDouble();
-      case 25:
-        return value.asInt();
-      case 35:
-      case 36:
-      case 39:
-        return value.asLong();
-      default:
-        return value.asString();
-    }
-  }
-
 }

@@ -18,9 +18,6 @@ package io.cdap.plugin.batch.mainframe.reader;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import io.cdap.cdap.api.annotation.Description;
-import io.cdap.cdap.api.annotation.Name;
-import io.cdap.cdap.api.annotation.Plugin;
 import io.cdap.cdap.api.data.batch.Input;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
@@ -61,9 +58,6 @@ import javax.ws.rs.Path;
  * <p>
  * For this first implementation, it will only accept binary fixed-length flat files without any nesting.
  */
-@Plugin(type = BatchSource.PLUGIN_TYPE)
-@Name("MainframeReader")
-@Description("Batch Source to read Mainframe fixed-length flat files")
 public class MainframeSource extends BatchSource<LongWritable, Map<String, AbstractFieldValue>, StructuredRecord> {
 
   private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);

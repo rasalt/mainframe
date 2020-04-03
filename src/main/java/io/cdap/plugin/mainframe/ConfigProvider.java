@@ -29,6 +29,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This class <code>ConfigProvider</code>.
+ */
 public final class ConfigProvider {
   private String layoutName;
   private String font;
@@ -38,7 +41,7 @@ public final class ConfigProvider {
   private IRecordDeciderX decider;
 
   private ConfigProvider(String layoutName, String font, String copyBookContent,
-                         String binaryFilePath, IRecordDeciderX decider){
+                         String binaryFilePath, IRecordDeciderX decider) {
     this.layoutName = layoutName;
     this.font = font;
     this.copyBookContent = copyBookContent;
@@ -70,7 +73,7 @@ public final class ConfigProvider {
     return copyBookContent;
   }
 
-  public InputStream getCopybookInputStream() throws IOException  {
+  public InputStream getCopybookInputStream() throws IOException {
     return IOUtils.toInputStream(copyBookContent, "UTF-8");
   }
 
@@ -82,6 +85,9 @@ public final class ConfigProvider {
     return decider;
   }
 
+  /**
+   * This class <code>Builder</code>.
+   */
   public static class Builder {
     private String font;
     private String layoutName;
@@ -121,7 +127,7 @@ public final class ConfigProvider {
     public ConfigProvider build() {
       IRecordDeciderBuilder decider = JRecordInterface1.RECORD_DECIDER_BUILDER;
       ISingleFieldDeciderBuilder builder = decider.singleFieldDeciderBuilder(deciderField, false);
-      for(Pair<String, String> selector : selectors) {
+      for (Pair<String, String> selector : selectors) {
         builder.addRecord(selector.getFirst(), selector.getSecond());
       }
       IRecordDeciderX build = selectors.size() > 0 ? builder.build() : null;

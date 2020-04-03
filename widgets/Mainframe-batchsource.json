@@ -4,61 +4,28 @@
   },
   "configuration-groups": [
     {
-      "label": "Mainframe Reader Configuration",
+      "label": "Basic",
       "properties": [
         {
           "widget-type": "textbox",
           "label": "Reference Name",
-          "name": "referenceName"
+          "name": "referenceName",
+          "widget-attributes" : {
+            "default": "Mainframe"
+          }
+        },
+        {
+          "widget-type": "textbox",
+          "label": "Path to file",
+          "name": "binaryFilePath",
+          "widget-attributes" : {
+            "placeholder" : "gc:// or file:// or hdfs://"
+          }
         },
         {
           "widget-type": "textarea",
-          "label": "COBOL Copybook",
+          "label": "Copybook",
           "name": "copybookContents"
-        },
-        {
-          "name": "replacements",
-          "label": "Text replacements",
-          "description": "Enter placeholders and their replacements in the copybook.",
-          "widget-type": "keyvalue",
-          "widget-attributes": {
-            "delimiter": ",",
-            "kv-delimiter": "="
-          }
-        },
-        {
-          "widget-type": "textbox",
-          "label": "Binary File Path",
-          "name": "binaryFilePath"
-        },
-        {
-          "widget-type": "csv",
-          "label": "Fields to keep",
-          "name": "keep",
-          "description": "List of fields to keep. Supersedes Fields to drop.",
-          "widget-attributes": {
-            "delimiter": ","
-          }
-        },
-        {
-          "widget-type": "csv",
-          "label": "Fields to drop",
-          "name": "drop",
-          "description": "List of fields to drop.",
-          "widget-attributes": {
-            "delimiter": ","
-          }
-        },
-        {
-          "widget-type": "textbox",
-          "label": "Maximum Split Size",
-          "name": "maxSplitSize"
-        },
-        {
-          "widget-type": "textbox",
-          "label": "Code page",
-          "description": "Code page to use, for example, cp037 or cp322. Supersedes the Character set.",
-          "name": "codepage"
         },
         {
           "widget-type": "select",
@@ -80,6 +47,37 @@
               "EBCDIC-US"
             ],
             "default": "EBCDIC-US"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Advanced",
+      "properties": [
+        {
+          "widget-type": "textbox",
+          "label": "Decider field name",
+          "description": "Name of the field used to decide the split of records. E.g. WS-RECORD-TYPE.",
+          "name": "decider-field-name",
+          "widget-attributes" : {
+            "placeholder" : "WS-RECORD-TYPE"
+          }
+        },
+        {
+          "widget-type": "textbox",
+          "label": "Code page",
+          "description": "Code page to use, for example, cp037 or cp322. Supersedes the Character set.",
+          "name": "codepage",
+          "widget-attributes" : {
+            "default": "cp307"
+          }
+        },
+        {
+          "widget-type": "textbox",
+          "label": "Maximum Split Size",
+          "name": "maxSplitSize",
+          "widget-attributes" : {
+            "default": 1048576
           }
         }
       ]

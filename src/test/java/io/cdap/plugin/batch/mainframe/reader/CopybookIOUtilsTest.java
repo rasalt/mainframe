@@ -17,9 +17,9 @@ package io.cdap.plugin.batch.mainframe.reader;
 
 import com.google.common.collect.Lists;
 import io.cdap.cdap.api.data.schema.Schema;
+import io.cdap.plugin.mainframe.ConfigProvider;
 import io.cdap.plugin.mainframe.Datum;
 import io.cdap.plugin.mainframe.FixedLengthReader;
-import io.cdap.plugin.mainframe.ConfigProvider;
 import io.cdap.plugin.mainframe.MainframeRecord;
 import net.sf.JRecord.Common.AbstractFieldValue;
 import net.sf.JRecord.Common.BasicFileSchema;
@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -178,9 +179,9 @@ public class CopybookIOUtilsTest {
     FixedLengthReader reader = new FixedLengthReader();
     reader.initialize(provider);
     MainframeRecord record = reader.getRecord();
-    while(record.size() > 0) {
-      List<Datum> datums = record.get();
-      for (Datum datum : datums) {
+    while (record.size() > 0) {
+      Collection<Datum> collection = record.getCollection();
+      for (Datum datum : collection) {
         sb.append(datum.getName()).append("=").append(datum.getValue().asString()).append("|");
       }
       record = reader.getRecord();

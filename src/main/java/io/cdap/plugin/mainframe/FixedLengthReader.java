@@ -31,8 +31,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
+/**
+ * This class <code>FixedLengthParser</code> parser.
+ */
 public class FixedLengthReader implements MainframeReader {
-  private ConfigProvider provider;
   private AbstractLineReader reader;
   private AbstractLine line;
   private InputStream inputStream;

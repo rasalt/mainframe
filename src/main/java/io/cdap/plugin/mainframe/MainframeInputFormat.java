@@ -35,12 +35,12 @@ import java.io.IOException;
  * This class <code>MainFrameInputFormat</code> support FixedLength and Variable Length EBCDIC files.
  */
 public class MainframeInputFormat extends FileInputFormat<LongWritable, MainframeRecord> {
-  public static String CBL_FONT = "mainframe.font";
-  public static String CBL_CONTENT = "mainframe.copybook";
-  public static String CBL_DECIDER_KEY = "mainframe.decider.key";
-  public static String CBL_SELECTORS = "mainframe.selectors";
-  public static String CBL_FILE_STRUCTURE = "mainframe.structure";
-  public static String CBL_BINARY_FILE_PATH = "mainframe.binary.path";
+  public static String cblFont = "mainframe.font";
+  public static String cblContent = "mainframe.copybook";
+  public static String cblDeciderKey = "mainframe.decider.key";
+  public static String cblSelector = "mainframe.selectors";
+  public static String cblFileStructure = "mainframe.structure";
+  public static String cblBinaryFilePath = "mainframe.binary.path";
 
   /**
    * Sets font (encoding) for reading the mainframe file.
@@ -49,7 +49,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param font or encoding to be set for reader.
    */
   public static void setFont(Job job, String font) {
-    job.getConfiguration().set(CBL_FONT, font);
+    job.getConfiguration().set(cblFont, font);
   }
 
   /**
@@ -59,7 +59,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param content of the COBOL copybook.
    */
   public static void setCopybookContent(Job job, String content) {
-    job.getConfiguration().set(CBL_CONTENT, content);
+    job.getConfiguration().set(cblContent, content);
   }
 
   /**
@@ -69,7 +69,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param deciderKey to be used for selecting records.
    */
   public static void setDeciderKey(Job job, String deciderKey) {
-    job.getConfiguration().set(CBL_DECIDER_KEY, deciderKey);
+    job.getConfiguration().set(cblDeciderKey, deciderKey);
   }
 
   /**
@@ -79,7 +79,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param binaryFilePath specifies the path to the input file or directory.
    */
   public static void setBinaryFilePath(Job job, String binaryFilePath) {
-    job.getConfiguration().set(CBL_BINARY_FILE_PATH, binaryFilePath);
+    job.getConfiguration().set(cblBinaryFilePath, binaryFilePath);
   }
 
   /**
@@ -89,7 +89,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param selectors to be used for assigning records based on the values of <code>deciderKey</code>.
    */
   public static void setSelectors(Job job, String selectors) {
-    job.getConfiguration().set(CBL_SELECTORS, selectors);
+    job.getConfiguration().set(cblSelector, selectors);
   }
 
   /**
@@ -99,7 +99,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
    * @param fileStructure of the file being processed.
    */
   public static void setFileStructure(Job job, String fileStructure) {
-    job.getConfiguration().set(CBL_FILE_STRUCTURE, fileStructure);
+    job.getConfiguration().set(cblFileStructure, fileStructure);
   }
 
   /**
@@ -114,22 +114,22 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
     throws IOException, InterruptedException {
     Configuration conf = context.getConfiguration();
     // Configure the <code>ConfigProvider</code> passing font and layout name.
-    ConfigProvider.Builder configProvider = new ConfigProvider.Builder("", conf.get(CBL_FONT, "cp307"));
+    ConfigProvider.Builder configProvider = new ConfigProvider.Builder("", conf.get(cblFont, "cp307"));
     // Entire content of cobol copybook.
-    String copybook = conf.get(CBL_CONTENT);
+    String copybook = conf.get(cblContent);
     if (copybook != null && !copybook.trim().isEmpty()) {
-      configProvider.setCopybookContent(conf.get(CBL_CONTENT));
+      configProvider.setCopybookContent(conf.get(cblContent));
     } else {
       throw new IOException("COBOL copybook is not provided. Provide complete copybook");
     }
-    configProvider.setBinaryFilePath(conf.get(CBL_BINARY_FILE_PATH));
+    configProvider.setBinaryFilePath(conf.get(cblBinaryFilePath));
 
     // Decider key defines the primary field that <code>JRecord<code> would split on.
     // The selectors define the value for primary key and the record that it is associated
     // with the value of primary key matches. The format is specified as follow
     // (condition:record[;condition:record]*)
-    String deciderKey = conf.get(CBL_DECIDER_KEY, null);
-    String selectors = conf.get(CBL_SELECTORS, null);
+    String deciderKey = conf.get(cblDeciderKey, null);
+    String selectors = conf.get(cblSelector, null);
     if (deciderKey != null && selectors != null) {
       configProvider.setDeciderField(deciderKey);
       String[] selectorParts = selectors.split(",");
@@ -139,7 +139,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
       }
     }
     // Specifies the structure of the binary file as VB or Fixed.
-    String structure = conf.get(CBL_FILE_STRUCTURE);
+    String structure = conf.get(cblFileStructure);
     if (structure.equalsIgnoreCase("fixed")) {
       return new MainframeRecordReader(new FixedLengthReader(), configProvider.build());
     } else {
@@ -150,7 +150,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Mainfram
   @Override
   protected boolean isSplitable(JobContext context, Path filename) {
     Configuration conf = context.getConfiguration();
-    Path path = new Path(conf.get(CBL_BINARY_FILE_PATH));
+    Path path = new Path(conf.get(cblBinaryFilePath));
     final CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(path);
     return (null == codec) || codec instanceof SplittableCompressionCodec;
   }

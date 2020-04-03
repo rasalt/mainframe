@@ -19,14 +19,14 @@ package io.cdap.plugin.mainframe;
 import net.sf.JRecord.Details.fieldValue.IFieldValue;
 
 /**
- *
+ * This class <code>Datum</code>.
  */
 public final class Datum {
   private IFieldValue value;
   private String name;
 
   public Datum(String name, IFieldValue value) {
-    this.name = normalizeFieldName(name);
+    this.name = canonicalize(name);
     this.value = value;
   }
 
@@ -38,7 +38,7 @@ public final class Datum {
     return value;
   }
 
-  public static String normalizeFieldName(String fieldName) {
+  public static String canonicalize(String fieldName) {
     return fieldName.replace("-", "_");
   }
 }
