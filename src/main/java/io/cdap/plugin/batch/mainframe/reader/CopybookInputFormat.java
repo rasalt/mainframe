@@ -37,12 +37,8 @@ import java.util.LinkedHashMap;
  * InputFormat class for CopybookReader plugin.
  */
 public class CopybookInputFormat extends FileInputFormat<LongWritable, LinkedHashMap<String, AbstractFieldValue>> {
-
-
   public static final String COPYBOOK_INPUTFORMAT_CBL_CONTENTS = "copybook.inputformat.cbl.contents";
-
   public static final String COPYBOOK_INPUTFORMAT_DATA_HDFS_PATH = "copybook.inputformat.data.hdfs.path";
-
   public static final String COPYBOOK_INPUTFORMAT_DATA_FONT = "copybook.inputformat.data.font";
 
   public static void setCopybookInputformatCharset(Job job, String font) {

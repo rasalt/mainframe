@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.cdap.plugin.batch.mainframe.reader;
+package io.cdap.plugin.mainframe;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
@@ -31,6 +31,8 @@ import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.batch.BatchRuntimeContext;
 import io.cdap.cdap.etl.api.batch.BatchSource;
 import io.cdap.cdap.etl.api.batch.BatchSourceContext;
+import io.cdap.plugin.batch.mainframe.reader.CopybookIOUtils;
+import io.cdap.plugin.batch.mainframe.reader.MainframeSourceConfig;
 import io.cdap.plugin.common.SourceInputFormatProvider;
 import io.cdap.plugin.common.batch.JobUtils;
 import net.sf.JRecord.Common.AbstractFieldValue;
@@ -48,7 +50,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.Path;
@@ -62,12 +63,10 @@ import javax.ws.rs.Path;
  * For this first implementation, it will only accept binary fixed-length flat files without any nesting.
  */
 @Plugin(type = BatchSource.PLUGIN_TYPE)
-@Name("MainframeReader")
-@Description("Batch Source to read Mainframe fixed-length flat files")
-public class MainframeSource extends BatchSource<LongWritable, Map<String, AbstractFieldValue>, StructuredRecord> {
-
+@Name("Mainframe")
+@Description("Read EBCDIC mainframe fixed length and variable length record files")
+public class MainframeSource extends BatchSource<LongWritable, MainframeRecord, StructuredRecord> {
   private static final Logger LOG = LoggerFactory.getLogger(MainframeSource.class);
-
   private final MainframeSourceConfig config;
   private Schema outputSchema;
   private Set<String> fieldsToKeep;
@@ -83,7 +82,6 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     FailureCollector failureCollector = pipelineConfigurer.getStageConfigurer().getFailureCollector();
     config.validate(failureCollector);
     failureCollector.getOrThrowException();
-
     outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
@@ -94,44 +92,40 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
     if (!Strings.isNullOrEmpty(config.getKeep())) {
       fieldsToKeep = new HashSet<>();
       Splitter.on(",").trimResults().split(config.getKeep())
-        .forEach(keepField -> fieldsToKeep.add(normalizeFieldName(keepField)));
+        .forEach(keepField -> fieldsToKeep.add(Datum.normalizeFieldName(keepField)));
     } else if (!Strings.isNullOrEmpty(config.getDrop())) {
       fieldsToDrop = new HashSet<>();
       Splitter.on(",").trimResults().split(config.getDrop())
-        .forEach(dropField -> fieldsToDrop.add(normalizeFieldName(dropField)));
+        .forEach(dropField -> fieldsToDrop.add(Datum.normalizeFieldName(dropField)));
     }
     outputSchema = getOutputSchema(config.getCopyBookContents(), config.getFont());
-  }
-
-  private String normalizeFieldName(String fieldName) {
-    return fieldName.replace("-", "_");
   }
 
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
     Job job = JobUtils.createInstance();
-    CopybookInputFormat.setCopybookInputformatCblContents(job, config.getCopyBookContents());
-    CopybookInputFormat.setBinaryFilePath(job, config.getBinaryFilePath());
-    // Set the input file path for the job
-    CopybookInputFormat.setInputPaths(job, config.getBinaryFilePath());
-    CopybookInputFormat.setMaxInputSplitSize(job, config.getMaxSplitSize());
-    CopybookInputFormat.setCopybookInputformatCharset(job, config.getFont());
-    context.setInput(Input.of(config.referenceName, new SourceInputFormatProvider(CopybookInputFormat.class,
-                                                                                  job.getConfiguration())));
+    MainframeInputFormat.setInputPaths(job, config.getBinaryFilePath());
+    MainframeInputFormat.setMaxInputSplitSize(job, config.getMaxSplitSize());
+    MainframeInputFormat.setFont(job, config.getFont());
+    MainframeInputFormat.setCopybookContent(job, config.getCopyBookContents());
+    MainframeInputFormat.setBinaryFilePath(job, config.getBinaryFilePath());
+    context.setInput(Input.of(
+      config.referenceName, new SourceInputFormatProvider(
+        MainframeInputFormat.class, job.getConfiguration()
+      ))
+    );
   }
 
   @Override
-  public void transform(KeyValue<LongWritable, Map<String, AbstractFieldValue>> input,
-                        Emitter<StructuredRecord> emitter)
+  public void transform(KeyValue<LongWritable, MainframeRecord> input, Emitter<StructuredRecord> emitter)
     throws Exception {
-
-    Map<String, AbstractFieldValue> values = input.getValue();
+    MainframeRecord record = input.getValue();
     StructuredRecord.Builder builder = StructuredRecord.builder(outputSchema);
     for (Schema.Field field : outputSchema.getFields()) {
       String fieldName = field.getName();
-      if (values.containsKey(fieldName)) {
+      if (record.get(fieldName) != null) {
         try {
-          builder.set(fieldName, values.get(fieldName).asString());
+          builder.set(fieldName, record.get(fieldName).getValue().asString());
         } catch (Exception e) {
           throw new IllegalArgumentException(String.format(
             "Unable to extract value for field '%s' in record at offset %d: %s",
@@ -167,7 +161,7 @@ public class MainframeSource extends BatchSource<LongWritable, Map<String, Abstr
       externalRecord = CopybookIOUtils.getExternalRecord(bufferedInputStream, font);
       String fieldName;
       for (ExternalField field : externalRecord.getRecordFields()) {
-        fieldName = normalizeFieldName(field.getName());
+        fieldName = Datum.normalizeFieldName(field.getName());
         if (fieldsToKeep != null && !fieldsToKeep.contains(fieldName)) {
             continue;
         }

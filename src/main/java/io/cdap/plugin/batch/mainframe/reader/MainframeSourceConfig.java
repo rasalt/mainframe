@@ -77,7 +77,7 @@ public class MainframeSourceConfig extends ReferencePluginConfig {
     .put("EBCDIC-Turkey", "cp322").build();
 
   @VisibleForTesting
-  static final String DEFAULT_FONT = "cp037";
+  public static final String DEFAULT_FONT = "cp037";
 
   @Name(BINARY_FILE_PATH)
   @Description("Complete path of the .bin to be read; for example: 'hdfs://10.222.41.31:9000/test/DTAR020_FB.bin' " +
