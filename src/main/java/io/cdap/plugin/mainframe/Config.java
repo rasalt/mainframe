@@ -87,6 +87,7 @@ public class Config extends ReferencePluginConfig {
     "001000            05 DTAR020-KEYCODE-NO      PIC X(08).                         \n" +
     "001100            05 DTAR020-STORE-NO        PIC S9(03)   COMP-3.               \n" +
     "001200        03  DTAR020-DATE               PIC S9(07)   COMP-3. ")
+  @Macro
   String copybookContents;
 
   @Name(MAX_SPLIT_SIZE)
@@ -100,6 +101,7 @@ public class Config extends ReferencePluginConfig {
   @Description("Code page to use - an alternative notation to the Charset. For example, cp037 or cp322. " +
     "If this is configured, it overrides the charset property.")
   @VisibleForTesting
+  @Macro
   String codepage;
 
   @Name(CHARSET)
@@ -109,16 +111,32 @@ public class Config extends ReferencePluginConfig {
     "EBCDIC-Greece (cp875), EBCDIC-International (cp500), EBCDOC-Italy (cp280), EBCDIC-Russia (cp410)," +
     " EBCDIC-Spain (cp383), EBCDIC-Thailand (cp838), EBCDIC-Turkey (cp322).")
   @VisibleForTesting
+  @Macro
   String charset;
 
+  @Name("decider-field-name")
+  @Nullable
+  @Description("Name of the field used to decide the split of records. E.g. WS-RECORD-TYPE.")
+  @Macro
+  String deciderField;
+
+  @Name("selectors")
+  @Nullable
+  @Description("Specify the value of decider field and the record it's associated with.")
+  @Macro
+  String selectors;
+
   public Config(String referenceName, String binaryFilePath, String copybookContents, String drop,
-                String keep, Long maxSplitSize, String codepage, String charset, String replacements) {
+                String keep, Long maxSplitSize, String codepage, String charset,
+                String deciderField, String selectors) {
     super(referenceName);
     this.binaryFilePath = binaryFilePath;
     this.copybookContents = copybookContents;
     this.maxSplitSize = maxSplitSize;
     this.codepage = codepage;
     this.charset = charset;
+    this.deciderField = deciderField;
+    this.selectors = selectors;
   }
 
   private Config(Builder builder) {
@@ -128,6 +146,8 @@ public class Config extends ReferencePluginConfig {
     maxSplitSize = builder.maxSplitSize;
     codepage = builder.codepage;
     charset = builder.charset;
+    deciderField = builder.deciderField;
+    deciderField = builder.selectors;
   }
 
   public static Builder builder() {
@@ -154,6 +174,14 @@ public class Config extends ReferencePluginConfig {
 
   public Long getMaxSplitSize() {
     return maxSplitSize != null ? maxSplitSize * CONVERT_TO_BYTES : DEFAULT_MAX_SPLIT_SIZE_IN_MB * CONVERT_TO_BYTES;
+  }
+
+  public String getDeciderField() {
+    return deciderField;
+  }
+
+  public String getSelectors() {
+    return selectors;
   }
 
   @Nullable
@@ -193,8 +221,20 @@ public class Config extends ReferencePluginConfig {
     private String charset;
     private String binaryFilePath;
     private Long maxSplitSize;
+    private String deciderField;
+    private String selectors;
 
     private Builder() {
+    }
+
+    public Builder setSelectors(String selectors) {
+      this.selectors = selectors;
+      return this;
+    }
+
+    public Builder setDeciderField(String deciderField) {
+      this.deciderField = deciderField;
+      return this;
     }
 
     public Builder setReferenceName(String referenceName) {

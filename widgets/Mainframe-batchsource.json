@@ -64,6 +64,16 @@
           }
         },
         {
+          "widget-type": "keyvalue",
+          "label": "Select records",
+          "name": "selectors",
+          "description": "Specify the value of decider field and the record it's associated with.",
+          "widget-attributes": {
+            "delimiter": ",",
+            "kv-delimiter": ":"
+          }
+        },
+        {
           "widget-type": "textbox",
           "label": "Code page",
           "description": "Code page to use, for example, cp037 or cp322. Supersedes the Character set.",

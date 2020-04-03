@@ -83,6 +83,8 @@ public class MainframeSource extends BatchSource<LongWritable, MainframeRecord, 
     MainframeInputFormat.setFont(job, config.getFont());
     MainframeInputFormat.setCopybookContent(job, config.getCopyBookContents());
     MainframeInputFormat.setBinaryFilePath(job, config.getBinaryFilePath());
+    MainframeInputFormat.setDeciderKey(job, config.getDeciderField());
+    MainframeInputFormat.setSelectors(job, config.getSelectors());
     context.setInput(Input.of(
       config.referenceName, new SourceInputFormatProvider(
         MainframeInputFormat.class, job.getConfiguration()
