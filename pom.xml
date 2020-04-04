@@ -70,11 +70,17 @@
   <properties>
     <jrecord.version>0.90.2</jrecord.version>
     <cb2xml.version>0.90.2</cb2xml.version>
-    <main.basedir>${project.basedir}</main.basedir>
+    <avro.version>1.7.7</avro.version>
+    <janino.version>3.0.7</janino.version>
+    <legstar.avro.version>0.4.2</legstar.avro.version>
     <cdap.version>6.1.1</cdap.version>
     <guava.version>19.0</guava.version>
+    <logback.version>1.2.3</logback.version>
     <hadoop.version>2.3.0</hadoop.version>
     <hydrator.version>2.2.0</hydrator.version>
+    <data.stream.parent>system:cdap-data-streams[6.1.0-SNAPSHOT,7.0.0-SNAPSHOT)</data.stream.parent>
+    <data.pipeline.parent>system:cdap-data-pipeline[6.1.0-SNAPSHOT,7.0.0-SNAPSHOT)</data.pipeline.parent>
+    <main.basedir>${project.basedir}</main.basedir>
     <widgets.dir>widgets</widgets.dir>
     <docs.dir>docs</docs.dir>
   </properties>
@@ -92,25 +98,21 @@
       <groupId>io.cdap.cdap</groupId>
       <artifactId>cdap-api</artifactId>
       <version>${cdap.version}</version>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.cdap.cdap</groupId>
       <artifactId>cdap-etl-api</artifactId>
       <version>${cdap.version}</version>
-      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.cdap.plugin</groupId>
+      <artifactId>hydrator-common</artifactId>
+      <version>${hydrator.version}</version>
     </dependency>
     <dependency>
       <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-unit-test</artifactId>
+      <artifactId>cdap-formats</artifactId>
       <version>${cdap.version}</version>
-      <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>asm</groupId>
-            <artifactId>asm</artifactId>
-          </exclusion>
-       </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -124,24 +126,49 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>net.sf.JRecord</groupId>
-      <artifactId>JRecord</artifactId>
-      <version>${jrecord.version}</version>
-      <scope>system</scope>
-      <systemPath>${project.basedir}/repo/JRecord.jar</systemPath>
-    </dependency>
-    <dependency>
-      <groupId>net.sf.cb2xml</groupId>
-      <artifactId>cb2xml</artifactId>
-      <version>${cb2xml.version}</version>
-      <scope>system</scope>
-      <systemPath>${project.basedir}/repo/cb2xml.jar</systemPath>
-    </dependency>
-    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <version>${hadoop.version}</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+      <version>${janino.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.legsem.legstar</groupId>
+      <artifactId>legstar.avro.cob2avro</artifactId>
+      <version>${legstar.avro.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-core</artifactId>
+      <version>${logback.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>${logback.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.cdap.cdap</groupId>
@@ -149,51 +176,7 @@
       <version>${cdap.version}</version>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-proto</artifactId>
-      <version>${cdap.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-formats</artifactId>
-      <version>${cdap.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-etl-proto</artifactId>
-      <version>${cdap.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-etl-batch</artifactId>
-      <version>${cdap.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.cdap.cdap</groupId>
-      <artifactId>cdap-data-pipeline</artifactId>
-      <version>${cdap.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <version>1.4</version>
-    </dependency>
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <version>1.6</version>
-    </dependency>
-    <dependency>
-      <groupId>io.cdap.plugin</groupId>
-      <artifactId>hydrator-common</artifactId>
-      <version>${hydrator.version}</version>
-    </dependency>
+
   </dependencies>
 
   <build>
@@ -330,15 +313,16 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>2.5.4</version>
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <_exportcontents>io.cdap.plugin.mainframe.*</_exportcontents>
-            <Embed-Dependency>*;inline=false;scope=compile|system</Embed-Dependency>
+            <_exportcontents>
+              io.cdap.plugin.mainframe.*;
+            </_exportcontents>
+            <Embed-Dependency>*;inline=false;scope=compile</Embed-Dependency>
             <Embed-Transitive>true</Embed-Transitive>
             <Embed-Directory>lib</Embed-Directory>
-            <!--Only @Plugin classes in the export packages will be included as plugin-->
           </instructions>
         </configuration>
         <executions>
@@ -356,8 +340,8 @@
         <version>1.1.0</version>
         <configuration>
           <cdapArtifacts>
-            <parent>system:cdap-data-pipeline[6.1.0-SNAPSHOT,7.0.0-SNAPSHOT)</parent>
-            <parent>system:cdap-data-streams[6.1.0-SNAPSHOT,7.0.0-SNAPSHOT)</parent>
+            <parent>${data.pipeline.parent}</parent>
+            <parent>${data.stream.parent}</parent>
           </cdapArtifacts>
         </configuration>
         <executions>

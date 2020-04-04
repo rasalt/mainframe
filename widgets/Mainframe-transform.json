@@ -9,18 +9,10 @@
       "properties": [
         {
           "widget-type": "textbox",
-          "label": "Reference Name",
-          "name": "referenceName",
+          "label": "Name of the field containing EBCDIC records",
+          "name": "contentFieldName",
           "widget-attributes" : {
-            "default": "Mainframe"
-          }
-        },
-        {
-          "widget-type": "textbox",
-          "label": "Path to file",
-          "name": "filepath",
-          "widget-attributes" : {
-            "placeholder" : "gc:// or file:// or hdfs://"
+            "placeholder" : "body"
           }
         },
         {
@@ -251,14 +243,6 @@
             },
             "default": "on"
           }
-        },
-        {
-          "widget-type": "textbox",
-          "label": "Maximum Split Size (MB)",
-          "name": "maxSplitSize",
-          "widget-attributes" : {
-            "placeholder": 1
-          }
         }
       ]
     }
@@ -280,12 +264,5 @@
         "schema-default-type": "string"
       }
     }
-  ],
-  "jump-config": {
-    "datasets": [
-      {
-        "ref-property-name": "referenceName"
-      }
-    ]
-  }
+  ]
 }
