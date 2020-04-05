@@ -20,7 +20,6 @@ import com.google.common.io.Resources;
 import com.legstar.avro.cob2avro.io.AbstractZosDatumReader;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
-import io.cdap.cdap.format.StructuredRecordStringConverter;
 import io.cdap.plugin.mainframe.common.AvroConverter;
 import io.cdap.plugin.mainframe.reader.CopybookReader;
 import org.apache.avro.generic.GenericRecord;
@@ -32,35 +31,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
-import java.util.Set;
-import java.util.SortedMap;
 
 /**
- *
+ * This class provides tests for <code>CopyReader</code>.
  */
-public class SimpleTest {
-
-  private static final Logger LOG = LoggerFactory.getLogger(SimpleTest.class);
+public class CopyReaderTest {
+  private static final Logger LOG = LoggerFactory.getLogger(CopyReaderTest.class);
 
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
 
   @Test
-  public void test() throws Exception {
+  public void testBasic() throws Exception {
     URL copyBookURL = getClass().getClassLoader().getResource("custdat.cpbk");
-
     Assert.assertNotNull(copyBookURL);
 
     Properties properties =  new Properties();
     CopybookReader copybookReader = new CopybookReader(Resources.asCharSource(copyBookURL, StandardCharsets.UTF_8),
                                                        properties);
-
     URL dataURL = getClass().getClassLoader().getResource("custdat.bin");
 
     Assert.assertNotNull(dataURL);
@@ -68,22 +58,12 @@ public class SimpleTest {
 
     try (AbstractZosDatumReader<GenericRecord> reader =
            copybookReader.createRecordReader(Resources.asByteSource(dataURL), "IBM01140", true)) {
+      int count = 0;
       for (GenericRecord record : reader) {
         StructuredRecord structuredRecord = AvroConverter.fromAvroRecord(record, schema);
-        LOG.trace(StructuredRecordStringConverter.toJsonString(structuredRecord));
+        count++;
       }
+      Assert.assertEquals(10000, count);
     }
-  }
-
-  @Test
-  public void testCharset() throws Exception {
-    SortedMap<String, Charset> charsets = Charset.availableCharsets();
-    Set<String> strings = charsets.keySet();
-    List<String> array = new ArrayList<>(strings);
-    Collections.sort(array);
-    for (String v : array) {
-      System.out.println("\"" + v + "\",");
-    }
-
   }
 }

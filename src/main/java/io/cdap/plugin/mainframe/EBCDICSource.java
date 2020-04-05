@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -15,21 +15,27 @@
  */
 package io.cdap.plugin.mainframe;
 
+import com.google.common.base.Preconditions;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
 import io.cdap.cdap.api.data.batch.Input;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
+import io.cdap.cdap.api.dataset.lib.KeyValue;
+import io.cdap.cdap.etl.api.Emitter;
 import io.cdap.cdap.etl.api.FailureCollector;
+import io.cdap.cdap.etl.api.InvalidEntry;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.batch.BatchRuntimeContext;
 import io.cdap.cdap.etl.api.batch.BatchSource;
 import io.cdap.cdap.etl.api.batch.BatchSourceContext;
+import io.cdap.plugin.common.LineageRecorder;
 import io.cdap.plugin.common.SourceInputFormatProvider;
 import io.cdap.plugin.common.batch.JobUtils;
 import io.cdap.plugin.mainframe.config.SourceConfig;
 import io.cdap.plugin.mainframe.format.MainframeInputFormat;
+import io.cdap.plugin.mainframe.format.MainframeRecord;
 import io.cdap.plugin.mainframe.schema.CopybookSchema;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -37,31 +43,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 /**
  * {@link EBCDICSource} is a EBCDIC mainframe reader.
- *
- * This class <code>EBCDICSource</code> supports reading of fixed length and variable block mainframe file formats.
  */
 @Plugin(type = BatchSource.PLUGIN_TYPE)
 @Name("Mainframe")
-@Description("Read EBCDIC mainframe fixed length and variable length record files.")
-public class EBCDICSource extends BatchSource<LongWritable, StructuredRecord, StructuredRecord> {
+@Description("EBCDIC mainframe reader for fixed blocked and variable blocked files.")
+public class EBCDICSource extends BatchSource<LongWritable, MainframeRecord, StructuredRecord> {
   private static final Logger LOG = LoggerFactory.getLogger(EBCDICSource.class);
   private final SourceConfig config;
   private Schema outputSchema;
+  private static final Schema ERROR_SCHEMA =
+    Schema.recordOf("error", Schema.Field.of("error", Schema.of(Schema.Type.STRING)));
 
   public EBCDICSource(SourceConfig config) {
     this.config = config;
   }
 
+  /**
+   * Configures this plugin.
+   * @param configurer handle for configuring the plugin.
+   */
   @Override
-  public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
-    super.configurePipeline(pipelineConfigurer);
+  public void configurePipeline(PipelineConfigurer configurer) {
+    super.configurePipeline(configurer);
 
-    FailureCollector failureCollector = pipelineConfigurer.getStageConfigurer().getFailureCollector();
-    Schema inputSchema = pipelineConfigurer.getStageConfigurer().getInputSchema();
-    Schema outputSchema = config.getOutputSchemaAndValidate(failureCollector, inputSchema);
+    FailureCollector failureCollector = configurer.getStageConfigurer().getFailureCollector();
+    outputSchema = config.getOutputSchemaAndValidate(failureCollector);
 
     if (config.getFilepath().trim().isEmpty()) {
       failureCollector.addFailure(String.format("The path to file is not specified."),
@@ -71,19 +81,27 @@ public class EBCDICSource extends BatchSource<LongWritable, StructuredRecord, St
     }
     failureCollector.getOrThrowException();
 
-    pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
+    configurer.getStageConfigurer().setOutputSchema(outputSchema);
   }
 
-  @Override
-  public void initialize(BatchRuntimeContext context) throws Exception {
-    super.initialize(context);
-    CopybookSchema copybookToSchema = new CopybookSchema(config.getCopybook(), config.getCodeFormat());
-    outputSchema = copybookToSchema.getSchema();
-  }
-
+  /**
+   * Prepares the pipeline before pipeline starts executing.
+   *
+   * @param context handler for batch context.
+   * @throws IOException thrown if there is any issue validating or configuring this plugin.
+   */
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
     Job job = JobUtils.createInstance();
+
+    LineageRecorder lineageRecorder = new LineageRecorder(context, config.referenceName);
+    lineageRecorder.createExternalDataset(outputSchema);
+    lineageRecorder.recordRead("Read",
+                               String.format("Reading mainframe binary data from '%s'", config.getFilepath()),
+                               Preconditions.checkNotNull(outputSchema.getFields()).stream()
+                                 .map(Schema.Field::getName)
+                                 .collect(Collectors.toList()));
+
     MainframeInputFormat.setCopybook(job, config.getCopybook());
     MainframeInputFormat.setCharset(job, config.getCharset());
     MainframeInputFormat.setInputPaths(job, config.getFilepath());
@@ -94,5 +112,38 @@ public class EBCDICSource extends BatchSource<LongWritable, StructuredRecord, St
         MainframeInputFormat.class, job.getConfiguration()
       ))
     );
+  }
+
+  /**
+   * Initialises this plugin.
+   *
+   * @param context execution context.
+   * @throws Exception thrown if there is any issue with generating copybook.
+   */
+  @Override
+  public void initialize(BatchRuntimeContext context) throws Exception {
+    super.initialize(context);
+    CopybookSchema copybookToSchema = new CopybookSchema(config.getCopybook(), config.getCodeFormat());
+    outputSchema = copybookToSchema.getSchema();
+  }
+
+  /**
+   * Handles the record read from the source.
+   *
+   * @param input record that was read by the <code>MainframeRecoder</code>.
+   * @param emitter emits either error or actual read.
+   * @throws Exception thrown if there is issuing reading records.
+   */
+  @Override
+  public void transform(KeyValue<LongWritable, MainframeRecord> input,
+                        Emitter<StructuredRecord> emitter) throws Exception {
+    MainframeRecord record = input.getValue();
+    if (record.hasError()) {
+      StructuredRecord.Builder builder = StructuredRecord.builder(ERROR_SCHEMA);
+      builder.set("error", record.getErrorMessage());
+      emitter.emitError(new InvalidEntry<>(1, record.getErrorMessage(), builder.build()));
+    } else {
+      emitter.emit(record.getRecord());
+    }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -16,7 +16,6 @@
 
 package io.cdap.plugin.mainframe.format;
 
-import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.plugin.mainframe.reader.MainframeRecordReader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -36,7 +35,7 @@ import java.io.IOException;
 /**
  * This class <code>MainFrameInputFormat</code> support FixedLength and Variable Length EBCDIC files.
  */
-public class MainframeInputFormat extends FileInputFormat<LongWritable, StructuredRecord> {
+public class MainframeInputFormat extends FileInputFormat<LongWritable, MainframeRecord> {
   public static String cblCodeFormat = "mainframe.codeformat";
   public static String cblCharset = "mainframe.charset";
   public static String cblCopybook = "mainframe.copybook";
@@ -101,7 +100,7 @@ public class MainframeInputFormat extends FileInputFormat<LongWritable, Structur
    * @return a instance of <code>RecordReader</code>
    */
   @Override
-  public RecordReader<LongWritable, StructuredRecord> createRecordReader(InputSplit split, TaskAttemptContext context)
+  public RecordReader<LongWritable, MainframeRecord> createRecordReader(InputSplit split, TaskAttemptContext context)
     throws IOException, InterruptedException {
     Configuration conf = context.getConfiguration();
 

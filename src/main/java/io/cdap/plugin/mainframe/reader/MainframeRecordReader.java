@@ -23,6 +23,7 @@ import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.plugin.mainframe.common.AvroConverter;
 import io.cdap.plugin.mainframe.common.StreamByteSource;
 import io.cdap.plugin.mainframe.common.StreamCharSource;
+import io.cdap.plugin.mainframe.format.MainframeRecord;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,11 +45,11 @@ import java.util.Properties;
 /**
  * This class <code>MainframeRecordReader</code>.
  */
-public class MainframeRecordReader extends RecordReader<LongWritable, StructuredRecord> {
+public class MainframeRecordReader extends RecordReader<LongWritable, MainframeRecord> {
   private static final Logger LOG = LoggerFactory.getLogger(MainframeRecordReader.class);
-  private long position = 0;
+  private long start, end, position = 0;
   private LongWritable key = null;
-  private StructuredRecord value;
+  private MainframeRecord value;
   private String copybook;
   private String charset;
   private String filepath;
@@ -57,7 +58,8 @@ public class MainframeRecordReader extends RecordReader<LongWritable, Structured
   AbstractZosDatumReader<GenericRecord> reader;
   private Schema schema;
 
-  public MainframeRecordReader(String copybook, String charset, String filepath, String codeFormat, Boolean rdw) {
+  public MainframeRecordReader(String copybook, String charset, String filepath,
+                               String codeFormat, Boolean rdw) {
     this.copybook = copybook;
     this.charset = charset;
     this.filepath = filepath;
@@ -80,6 +82,9 @@ public class MainframeRecordReader extends RecordReader<LongWritable, Structured
     schema = getOutputSchemaAndValidate(copybookReader);
 
     FileSplit fileSplit = (FileSplit) split;
+    start = ((FileSplit) split).getStart();
+    end = split.getLength();
+
     BufferedInputStream fileIn = new BufferedInputStream(fs.open(fileSplit.getPath()));
 
     StreamByteSource source = new StreamByteSource(fileIn, split.getLength());
@@ -103,23 +108,33 @@ public class MainframeRecordReader extends RecordReader<LongWritable, Structured
     if (!reader.hasNext()) {
       return false;
     }
-    value = AvroConverter.fromAvroRecord(reader.next(), schema);
-    position++;
+
+    try {
+      StructuredRecord record = AvroConverter.fromAvroRecord(reader.next(), schema);
+      value = new MainframeRecord(record);
+    } catch (Exception e) {
+      value = new MainframeRecord(e.getMessage());
+    }
+
+    position = position + reader.getBytesRead();
     return true;
   }
 
   @Override
-  public StructuredRecord getCurrentValue() throws IOException, InterruptedException {
+  public MainframeRecord getCurrentValue() throws IOException, InterruptedException {
     return value;
   }
 
   @Override
   public float getProgress() throws IOException, InterruptedException {
-    return 0f;
+    if (start == end) {
+      return 0.0f;
+    } else {
+      return Math.min(1.0f, (position - start) / (float) (end - start));
+    }
   }
 
   @Override
   public void close() throws IOException {
-
   }
 }

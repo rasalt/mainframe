@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017-2019 Cask Data, Inc.
+ * Copyright © 2017-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -152,7 +152,7 @@ public class CopybookReader {
     }
 
     // If the copybook doesn't have top level record, insert one
-    CobolDataItem item = new CobolDataItem(1, "ROOT");
+    CobolDataItem item = new CobolDataItem(1, "Root");
     item.setChildren(cobolDataItems);
 
     cobolDataItems = new ArrayList<>();
@@ -186,7 +186,6 @@ public class CopybookReader {
     final Map<String, String> sources = generateCobolTypes(xmlSchema, classPackage);
     final long lastModified = System.currentTimeMillis();
     return new JavaSourceClassLoader(getClass().getClassLoader(), new ResourceFinder() {
-
       @Nullable
       @Override
       public Resource findResource(final String resourceName) {

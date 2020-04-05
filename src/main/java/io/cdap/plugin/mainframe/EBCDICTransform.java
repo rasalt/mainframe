@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017-2019 Cask Data, Inc.
+ * Copyright © 2017-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -57,7 +57,7 @@ public class EBCDICTransform extends Transform<StructuredRecord, StructuredRecor
   public void initialize(TransformContext context) throws Exception {
     super.initialize(context);
     this.copybookReader = config.getCopybookReader();
-    this.schema = config.getOutputSchemaAndValidate(copybookReader);
+    this.schema = config.getOutputSchema(copybookReader);
   }
 
   @Override
@@ -66,7 +66,7 @@ public class EBCDICTransform extends Transform<StructuredRecord, StructuredRecor
 
     FailureCollector failureCollector = pipelineConfigurer.getStageConfigurer().getFailureCollector();
     Schema inputSchema = pipelineConfigurer.getStageConfigurer().getInputSchema();
-    Schema outputSchema = config.getOutputSchemaAndValidate(failureCollector, inputSchema);
+    Schema outputSchema = config.getOutputSchemaAndValidate(failureCollector);
     failureCollector.getOrThrowException();
 
     pipelineConfigurer.getStageConfigurer().setOutputSchema(outputSchema);
@@ -74,7 +74,7 @@ public class EBCDICTransform extends Transform<StructuredRecord, StructuredRecor
 
   @Override
   public void transform(StructuredRecord input, Emitter<StructuredRecord> emitter) throws Exception {
-    byte[] body = input.get(config.getContentFieldName());
+    byte[] body = input.get(config.getFieldName());
     StreamByteSource source = new StreamByteSource(new ByteArrayInputStream(body), body.length);
     try (AbstractZosDatumReader<GenericRecord> reader = copybookReader.createRecordReader(source, config.getCharset(),
                                                                                           config.hasRDW())) {

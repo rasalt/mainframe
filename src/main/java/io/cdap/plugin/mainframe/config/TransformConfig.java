@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017-2019 Cask Data, Inc.
+ * Copyright © 2017-2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -23,23 +23,26 @@ import io.cdap.cdap.api.annotation.Name;
 import javax.annotation.Nullable;
 
 /**
- * <code>CobolRecordConvertorConfig</code> provides configuration for <code>CobolRecordConverter</code>.
+ * <code>CobolRecordConvertorConfig</code> provides configuration for <code>EBCDICTransform</code>.
  */
 public class TransformConfig extends ConfigCommon {
-  public static final String PROPERTY_CONTENT_FIELD_NAME = "contentFieldName";
+  public static final String PROPERTY_CONTENT_FIELD_NAME = "fieldname";
 
   @Name(PROPERTY_CONTENT_FIELD_NAME)
-  @Description("Name of the field containing COBOL records")
+  @Description("Name of input field that contains cobol data files")
   @Macro
-  private final String contentFieldName;
+  private final String fieldName;
 
   public TransformConfig(String copybook, @Nullable String charset, @Nullable String codeFormat,
-                         @Nullable Boolean rdw, String contentFieldName) {
+                         @Nullable Boolean rdw, String fieldName) {
     super(copybook, charset, codeFormat, rdw);
-    this.contentFieldName = contentFieldName;
+    this.fieldName = fieldName;
   }
 
-  public String getContentFieldName() {
-    return contentFieldName;
+  /**
+   * @return Name of the field in the input schema that contains cobol data record.
+   */
+  public String getFieldName() {
+    return fieldName;
   }
 }

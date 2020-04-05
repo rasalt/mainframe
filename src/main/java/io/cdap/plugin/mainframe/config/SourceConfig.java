@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2019 Cask Data, Inc.
+ * Copyright © 2020 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -22,7 +22,7 @@ import io.cdap.cdap.api.annotation.Name;
 import javax.annotation.Nullable;
 
 /**
- * Mainframe Reader plugin configuration.
+ * Mainframe Source plugin configuration.
  */
 public class SourceConfig extends ConfigCommon {
   public static final String PROPERTY_REFERENCE = "referenceName";
@@ -57,6 +57,9 @@ public class SourceConfig extends ConfigCommon {
     this.maxSplitSize = maxSplitSize;
   }
 
+  /**
+   * @return the path to file or folder containing the file.
+   */
   public String getFilepath() {
     return filepath;
   }
