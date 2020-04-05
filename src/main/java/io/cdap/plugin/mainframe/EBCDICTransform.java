@@ -27,7 +27,6 @@ import io.cdap.cdap.etl.api.FailureCollector;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.Transform;
 import io.cdap.cdap.etl.api.TransformContext;
-import io.cdap.cdap.format.StructuredRecordStringConverter;
 import io.cdap.plugin.mainframe.common.AvroConverter;
 import io.cdap.plugin.mainframe.common.StreamByteSource;
 import io.cdap.plugin.mainframe.config.TransformConfig;
@@ -79,7 +78,6 @@ public class EBCDICTransform extends Transform<StructuredRecord, StructuredRecor
     try (AbstractZosDatumReader<GenericRecord> reader = copybookReader.createRecordReader(source, config.getCharset(),
                                                                                           config.hasRDW())) {
       for (GenericRecord record : reader) {
-        LOG.info(StructuredRecordStringConverter.toJsonString(AvroConverter.fromAvroRecord(record, schema)));
         emitter.emit(AvroConverter.fromAvroRecord(record, schema));
       }
     }

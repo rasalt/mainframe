@@ -263,7 +263,6 @@
       ]
     }
   ],
-  "emit-alerts": true,
   "emit-errors": true,
   "outputs": [
     {
