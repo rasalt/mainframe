@@ -5,78 +5,71 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Join CDAP community](https://cdap-users.herokuapp.com/badge.svg?t=wrangler)](https://cdap-users.herokuapp.com?t=1)
 
-Introduction
-============
+# Introduction
 
-Mainframe Reader plugin is a source plugin for Hydrator that can read EBCDIC data format. It uses JRecord and Cobol copy book input format to read mainframe data. 
-To use the plugin the binary mainframe file and the copybook is needed. Various EBCDIC CCSIDs (Coded Character Set Identifiers) are supported:
- - EBCDIC US (CCSID 037)
- - EBCDIC Germany (CCSID 237)
- - EBCDIC-Arabic (CCSID 420)
- - EBCDIC-Denmark, Norway (CCSID 277)
- - EBCDIC-France (CCSID 297)
- - EBCDIC-Greece (CCSID 875)
- - EBCDIC-International (CCSID 500)
- - EBCDIC-Italy (CCSID 280)
- - EBCDIC-Russia (CCSID 410)
- - EBCDIC-Spain (CCSID 283)
- - EBCDIC-Thailand (CCSID 838)
- - EBCDIC-Turkey (CCSID 322)
+Mainframe repo has collection of plugins that support reading and transforming mainframe generated data files. 
 
+## COBOL Files
+COBOL files are ASCII or EBCDIC fixed-width files that can contain text and/or binary data. 
+You have COBOL copybook files, which describe the structure of the data, and COBOL data files, 
+which contain the actual data. If your COBOL files come from a mainframe, they are in EBCDIC format. 
+If your COBOL files come from a Windows machine, they are in ASCII format.
 
-Getting Started
-===============
+## Copybook
+COBOL copybook, contains only the fields and datatypes used in the COBOL file. The plugin can directly 
+import COBOL copybooks (.cpy files) as definitions for generating the target schema. Schema definition
+is based on analyzing entire copybook including REDEFINES and OCCURS. Schema can be simple or complex.
 
-Prerequisites
--------------
+## Type Mapping
+
+| COBOL Type | PICTURE string | Example | Target Type |
+|------------|----------------|---------|-------------|
+| Alphabetic | A | PIC A(20) | String |
+| AlphaNumeric | X (Combination of A,X, & 9) | PIC X(12) | String |
+| Numeric | COMP-5 or BINARY | PIC S9 BINARY/PIC S999999 BINARY/PIC S9999999999 BINARY | Short/Integer/Long |
+| Numeric | DISPLAY, COMP-3, PACKED-DECIMAL and ARITH(extend) | PIC S9(19) through S9(31) | byte[] |
+| Numeric | DISPLAY, COMP-3, PACKED-DECIMAL and ARITH(extend) | S9(19) through S9(31), 9(19) through 9(31) | byte[] |
+| DBCS | G, B, or N with DISPLAY-1 | PIC G(10) | String |
+| National | PIC N(8) | | String |  
+
+## Character Encodings 
+The list of available character sets is determined by the Java Runtime Environment (JRE). Most of the time the 
+JRE will have the character set you need. However, if you are using EBCDIC, the default character sets that come 
+with the JRE do not include the EBCDIC character sets. There is no single character set for EBCDIC. Rather, 
+there are EBCDIC character sets for different locales. For example, the English EBCDIC encoding is called IBM037 
+or CP037. When referencing the links below that describe the character sets, the EBCDIC character sets generally 
+included in those are identified as IBM, but there are many IBM character sets on the list that are not actually EBCDIC.
+
+If your character set is not present, it's likely part of the extended characters sets that are not automatically 
+installed into your Java Runtime Environment (JRE). These links list the supported character sets for JRE 5 or JRE 6. 
+To install the extended character set, get the charsets.jar file, which is an option in the Java installation, 
+and place it in the lib directory of your JRE. See your system administrator if you need help with this.
+
+If the character set is not present in any of the lists, then it is invalid and needs to be changed to a value that 
+is on the list.
+
+# Prerequisites
 CDAP version 6.1.x or higher. 
   
-Building Plugins
-----------------
-You get started with Mainframe reader plugins by building directly from the latest source code. However, you need to 
-download the JRecord and cb2xml libraries from [sourceforge](https://sourceforge.net/projects/jrecord/) and place them 
-the ``repo`` directory before building the plugin. This is because these libraries are not yet available through the 
-public maven repository at Maven Central. The plugin is currently tested with version 0.90.2 of the JRecord library, so 
-please download that version. 
+# Build
+You get started with Mainframe  plugins by building directly from the latest source code. 
 
-    $ git clone https://github.com/data-integrations/mainframe-reader.git
-    $ cd mainframe-reader
-    <Download and place the JRecord libraries in the repo/ directory>
+    $ git clone https://github.com/data-integrations/mainframe.git
+    $ cd mainframe
     $ mvn clean package
 
 After the build completes, you will have a JAR for the plugin under each ``target/`` directory.
 
-Deploying Plugins
------------------
+# Deploy
 You can deploy a plugin using the CDAP CLI::
 
-  > load artifact <target/plugin-jar> config-file <resources/plugin-config>
-
-  > load artifact target/mainframe-reader-<version>.jar \
-         config-file target/mainframe-reader-<version>.json
+  > load artifact target/mainframe-&lt;version&gt;.jar config-file target/mainframe-&lt;version&gt;.json
 
 You can build without running tests: ``mvn clean install -DskipTests``
 
-Mailing Lists
--------------
-CDAP User Group and Development Discussions:
+# License and Trademarks
 
-- `cdap-user@googlegroups.com <https://groups.google.com/d/forum/cdap-user>`__
-
-The *cdap-user* mailing list is primarily for users using the product to develop
-applications or building plugins for appplications. You can expect questions from 
-users, release announcements, and any other discussions that we think will be helpful 
-to the users.
-
-IRC Channel
------------
-CDAP IRC Channel: #cdap on irc.freenode.net
-
-
-License and Trademarks
-======================
-
-Copyright © 2015-2019 Cask Data, Inc.
+Copyright © 2015-2020 Cask Data, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 in compliance with the License. You may obtain a copy of the License at

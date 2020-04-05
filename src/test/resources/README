@@ -1,9 +1,0 @@
-DTAR020_F8-modified.bin is the original DTAR020_F8.bin, modified to
-support testing redefines: We redefine the DTAR020-KCODE-STORE-KEY to
-be readable as a single 10-char string. For that, the STORE_NO must
-consist of bytes that are valid EBCDIC-US codes. Hence we replace the
-020c (+20.0) with 815c (+815.0 as a number or "a*" as a string) and
-825c (+825.0 or "b*").
-
-Keeping the original DTAR020_F8.bin here for reference, even though
-it is not used by the tests.
