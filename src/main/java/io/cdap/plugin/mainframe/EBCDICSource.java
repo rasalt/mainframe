@@ -92,16 +92,8 @@ public class EBCDICSource extends BatchSource<LongWritable, MainframeRecord, Str
    */
   @Override
   public void prepareRun(BatchSourceContext context) throws IOException {
+    // Prepare to pass all the arguments to all input formats.
     Job job = JobUtils.createInstance();
-
-    LineageRecorder lineageRecorder = new LineageRecorder(context, config.referenceName);
-    lineageRecorder.createExternalDataset(outputSchema);
-    lineageRecorder.recordRead("Read",
-                               String.format("Reading mainframe binary data from '%s'", config.getFilepath()),
-                               Preconditions.checkNotNull(outputSchema.getFields()).stream()
-                                 .map(Schema.Field::getName)
-                                 .collect(Collectors.toList()));
-
     MainframeInputFormat.setCopybook(job, config.getCopybook());
     MainframeInputFormat.setCharset(job, config.getCharset());
     MainframeInputFormat.setInputPaths(job, config.getFilepath());
@@ -112,6 +104,19 @@ public class EBCDICSource extends BatchSource<LongWritable, MainframeRecord, Str
         MainframeInputFormat.class, job.getConfiguration()
       ))
     );
+
+    // Generate schema from copybook and emit lineage.
+    // TODO: Lineage for tested field needs some work.
+    CopybookSchema copybookToSchema = new CopybookSchema(config.getCopybook(), config.getCodeFormat());
+    LineageRecorder lineageRecorder = new LineageRecorder(context, config.referenceName);
+    outputSchema = copybookToSchema.getSchema();
+    lineageRecorder.createExternalDataset(outputSchema);
+
+    StringBuilder sb = new StringBuilder("Reading mainframe data from '");
+    sb.append(config.getFilepath()).append("', based on the provided copybook. ");
+    lineageRecorder.recordRead("Read", sb.toString(), Preconditions.checkNotNull(outputSchema.getFields()).stream()
+                                 .map(Schema.Field::getName)
+                                 .collect(Collectors.toList()));
   }
 
   /**
@@ -123,8 +128,6 @@ public class EBCDICSource extends BatchSource<LongWritable, MainframeRecord, Str
   @Override
   public void initialize(BatchRuntimeContext context) throws Exception {
     super.initialize(context);
-    CopybookSchema copybookToSchema = new CopybookSchema(config.getCopybook(), config.getCodeFormat());
-    outputSchema = copybookToSchema.getSchema();
   }
 
   /**

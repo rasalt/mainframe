@@ -62,10 +62,8 @@ After the build completes, you will have a JAR for the plugin under each ``targe
 
 # Deploy
 You can deploy a plugin using the CDAP CLI::
-
+  > $CDAP_HOME/bin/cdap cli
   > load artifact target/mainframe-&lt;version&gt;.jar config-file target/mainframe-&lt;version&gt;.json
-
-You can build without running tests: ``mvn clean install -DskipTests``
 
 # License and Trademarks
 
