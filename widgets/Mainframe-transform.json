@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "spec-version": "1.5"
+    "spec-version": "1.6"
   },
   "display-name": "Mainframe",
   "configuration-groups": [
@@ -247,6 +247,8 @@
       ]
     }
   ],
+  "emit-alerts": true,
+  "emit-errors": true,
   "outputs": [
     {
       "name": "schema",
